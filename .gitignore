@@ -10,11 +10,11 @@ node_modules/
 # Environment
 .env
 
-# Uploads & exports
-uploads/
-exports/
-logs/
-photos/
+# Uploads & exports (output dirs only)
+backend/uploads/
+backend/exports/
+backend/logs/
+backend/photos/
 
 # IDE
 .vscode/

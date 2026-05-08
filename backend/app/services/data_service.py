@@ -119,6 +119,7 @@ class DataStore:
         for df in [self.pat, self.mapping, self.savings, self.download]:
             if df is not None and "CanonicalMonth" in df.columns:
                 months.update(df["CanonicalMonth"].dropna().unique())
+        months.discard("NaT")
         return sorted(months)
 
     def get_latest_month(self) -> Optional[str]:

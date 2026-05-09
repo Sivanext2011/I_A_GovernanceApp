@@ -6,10 +6,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/exports:/app/exports
-      - ./backend/photos:/app/photos
-      - ./backend/logs:/app/logs
+      - ~/app-data/uploads:/app/uploads
+      - ~/app-data/exports:/app/exports
+      - ~/app-data/photos:/app/photos
+      - ~/app-data/logs:/app/logs
     environment:
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
       - AZURE_TENANT_ID=${AZURE_TENANT_ID}

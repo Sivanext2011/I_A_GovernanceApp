@@ -115,29 +115,51 @@ interface MonthSelectProps {
 }
 
 export function MonthMultiSelect({ months }: MonthSelectProps) {
-  const { selectedMonths, setMonths } = useAppStore()
+  const { selectedMonths, setMonths, excludedMonths, setExcludedMonths } = useAppStore()
 
   const toggle = (m: string) => {
     setMonths(selectedMonths.includes(m) ? selectedMonths.filter(x => x !== m) : [...selectedMonths, m])
+    // Remove from excluded if selecting
+    if (excludedMonths.includes(m)) setExcludedMonths(excludedMonths.filter(x => x !== m))
+  }
+
+  const toggleExclude = (m: string) => {
+    setExcludedMonths(excludedMonths.includes(m) ? excludedMonths.filter(x => x !== m) : [...excludedMonths, m])
+    // Remove from selected if excluding
+    if (selectedMonths.includes(m)) setMonths(selectedMonths.filter(x => x !== m))
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <button
-        onClick={() => setMonths([])}
-        className={cn('team-tab text-xs', selectedMonths.length === 0 ? 'team-tab-active' : 'team-tab-inactive')}
-      >
-        All
-      </button>
-      {months.map((m) => (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2">
         <button
-          key={m}
-          onClick={() => toggle(m)}
-          className={cn('team-tab text-xs', selectedMonths.includes(m) ? 'team-tab-active' : 'team-tab-inactive')}
+          onClick={() => { setMonths([]); setExcludedMonths([]) }}
+          className={cn('team-tab text-xs', selectedMonths.length === 0 && excludedMonths.length === 0 ? 'team-tab-active' : 'team-tab-inactive')}
         >
-          {m}
+          All
         </button>
-      ))}
+        {months.map((m) => (
+          <button
+            key={m}
+            onClick={() => toggle(m)}
+            className={cn('team-tab text-xs', selectedMonths.includes(m) ? 'team-tab-active' : excludedMonths.includes(m) ? 'team-tab-excluded' : 'team-tab-inactive')}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 items-center">
+        <span className="text-xs text-[var(--text-secondary)]">Exclude:</span>
+        {months.map((m) => (
+          <button
+            key={m}
+            onClick={() => toggleExclude(m)}
+            className={cn('text-xs px-2 py-0.5 rounded', excludedMonths.includes(m) ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-slate-100 dark:bg-slate-800 text-[var(--text-secondary)]')}
+          >
+            {excludedMonths.includes(m) ? '✕ ' : ''}{m}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

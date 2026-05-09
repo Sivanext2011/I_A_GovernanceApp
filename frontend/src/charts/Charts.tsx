@@ -77,8 +77,8 @@ export function DepartmentComparison({ teams, total_savings, savings_percent }: 
   const theme = useChartTheme()
   if (!teams || teams.length === 0) return null
   return (
-    <div className="glass-card p-4 lg:col-span-2">
-      <h3 className="text-sm font-semibold mb-2">Department Comparison</h3>
+    <div className="glass-card p-4">
+      <h3 className="text-sm font-semibold mb-2">Department wise Savings</h3>
       <Plot
         data={[
           { x: teams, y: total_savings, type: 'bar', name: 'Total Savings', marker: { color: '#3b82f6' } },

@@ -75,8 +75,9 @@ interface DeptCompProps {
 
 export function DepartmentComparison({ teams, total_savings, savings_percent }: DeptCompProps) {
   const theme = useChartTheme()
+  if (!teams || teams.length === 0) return null
   return (
-    <div className="glass-card p-4">
+    <div className="glass-card p-4 lg:col-span-2">
       <h3 className="text-sm font-semibold mb-2">Department Comparison</h3>
       <Plot
         data={[

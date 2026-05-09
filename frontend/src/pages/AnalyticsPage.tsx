@@ -52,7 +52,7 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {trend && <MonthlySavingsTrend months={trend.months} series={trend.series} />}
         {trend && <SavingsPercentTrend months={trend.months} values={trend.series.savings_percent} />}
-        {deptComp && <DepartmentComparison teams={deptComp.teams} total_savings={deptComp.total_savings} savings_percent={deptComp.savings_percent} />}
+        {deptComp && deptComp.teams?.length > 0 && <DepartmentComparison teams={deptComp.teams} total_savings={deptComp.total_savings} savings_percent={deptComp.savings_percent} />}
         {dlReuse && <DownloadsVsReuse months={dlReuse.months} downloads={dlReuse.downloads} reuse={dlReuse.reuse} />}
         {pendingTrend && <PendingFeedbackChart months={pendingTrend.months} pending={pendingTrend.pending} />}
       </div>

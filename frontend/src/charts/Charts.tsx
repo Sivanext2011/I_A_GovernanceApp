@@ -84,7 +84,7 @@ export function DepartmentComparison({ teams, total_savings, savings_percent }: 
           { x: teams, y: total_savings, type: 'bar', name: 'Total Savings', marker: { color: '#3b82f6' } },
           { x: teams, y: savings_percent, type: 'scatter', mode: 'lines+markers', name: 'Savings %', yaxis: 'y2', line: { color: '#ef4444', width: 2 } },
         ]}
-        layout={{ ...theme, margin: { t: 20, r: 60, b: 40, l: 60 }, yaxis2: { overlaying: 'y', side: 'right', title: '%', gridcolor: 'transparent' }, barmode: 'group', autosize: true }}
+        layout={{ ...theme, margin: { t: 20, r: 60, b: 40, l: 60 }, xaxis: { ...theme.xaxis, type: 'category' }, yaxis2: { overlaying: 'y', side: 'right', title: '%', gridcolor: 'transparent' }, barmode: 'group', autosize: true }}
         config={{ responsive: true, displayModeBar: false }}
         style={{ width: '100%', height: '300px' }}
       />

@@ -148,24 +148,51 @@ export default function MissingSavingsPage() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className="glass-card p-4 flex items-center justify-between"
+              className="glass-card p-4 space-y-3"
             >
-              <div className="flex items-center gap-4">
-                <button onClick={() => toggleSelect(rec.signum)} className="hover:text-blue-600">
-                  {selected.has(rec.signum) ? <CheckSquare className="w-5 h-5 text-blue-600" /> : <Square className="w-5 h-5" />}
-                </button>
-                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button onClick={() => toggleSelect(rec.signum)} className="hover:text-blue-600">
+                    {selected.has(rec.signum) ? <CheckSquare className="w-5 h-5 text-blue-600" /> : <Square className="w-5 h-5" />}
+                  </button>
+                  <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{rec.name}</p>
+                    <p className="text-xs text-[var(--text-secondary)]">{rec.email} • {rec.department}</p>
+                    {rec.manager_email && <p className="text-xs text-[var(--text-secondary)]">Manager CC: {rec.manager_email}</p>}
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium">{rec.name}</p>
-                  <p className="text-xs text-[var(--text-secondary)]">{rec.email} • {rec.department}</p>
+                <div className="text-right">
+                  <p className="text-sm font-medium">{rec.pat_count} PATs</p>
+                  <p className="text-xs text-red-500">Savings: {rec.total_savings}</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-medium">{rec.pat_count} PATs</p>
-                <p className="text-xs text-red-500">Savings: {rec.total_savings}</p>
-              </div>
+              {rec.pat_activities && rec.pat_activities.length > 0 && (
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="text-left text-[var(--text-secondary)] bg-slate-50 dark:bg-slate-800">
+                      <th className="p-2 border border-[var(--border)]">PAT ID</th>
+                      <th className="p-2 border border-[var(--border)]">Activity Name</th>
+                      <th className="p-2 border border-[var(--border)]">Start Date & Time</th>
+                      <th className="p-2 border border-[var(--border)]">End Date & Time</th>
+                      <th className="p-2 border border-[var(--border)]">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rec.pat_activities.map((act: any, i: number) => (
+                      <tr key={i} className="border-t border-[var(--border)]">
+                        <td className="p-2 border border-[var(--border)]">{act.pat_id}</td>
+                        <td className="p-2 border border-[var(--border)]">{act.activity_name}</td>
+                        <td className="p-2 border border-[var(--border)]">{act.start_date}</td>
+                        <td className="p-2 border border-[var(--border)]">{act.end_date}</td>
+                        <td className="p-2 border border-[var(--border)]">{act.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </motion.div>
           ))}
 

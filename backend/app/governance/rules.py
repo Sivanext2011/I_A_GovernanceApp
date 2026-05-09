@@ -55,6 +55,9 @@ def get_missing_savings(pat_months: list[str], savings_months: list[str], team: 
 
         if total_savings <= 0:
             name, email, dept = _enrich_practitioner_by_email(practitioner_email)
+            manager_email = _get_manager_email(practitioner_email)
+            # Get PAT activity details
+            pat_activities = _get_pat_activities(pat_df, practitioner_email)
             results.append({
                 "signum": practitioner_email,
                 "name": name,
@@ -63,6 +66,8 @@ def get_missing_savings(pat_months: list[str], savings_months: list[str], team: 
                 "pat_count": pat_count,
                 "total_savings": total_savings,
                 "status": "Non-Compliant",
+                "manager_email": manager_email,
+                "pat_activities": pat_activities,
             })
 
     return results
@@ -126,3 +131,36 @@ def _enrich_practitioner_by_email(practitioner_email: str) -> tuple[str, str, st
             email = str(match.iloc[0].get("Ericsson Email Address", practitioner_email))
             dept = str(match.iloc[0].get("Department", ""))
     return name, email, dept
+
+
+def _get_manager_email(practitioner_email: str) -> str:
+    if data_store.mapping is None or data_store.mapping.empty:
+        return ""
+    match = data_store.mapping[
+        data_store.mapping["Ericsson Email Address"].str.strip().str.lower() == str(practitioner_email).strip().lower()
+    ]
+    if match.empty:
+        return ""
+    supervisor_no = str(match.iloc[0].get("Supervisor Personal No.", "")).strip()
+    if not supervisor_no:
+        return ""
+    mgr_match = data_store.mapping[
+        data_store.mapping["Pers.no."].astype(str).str.strip() == supervisor_no
+    ]
+    if mgr_match.empty:
+        return ""
+    return str(mgr_match.iloc[0].get("Ericsson Email Address", ""))
+
+
+def _get_pat_activities(pat_df: pd.DataFrame, practitioner_email: str) -> list[dict]:
+    rows = pat_df[pat_df["Practitioner"].str.strip().str.lower() == str(practitioner_email).strip().lower()]
+    activities = []
+    for _, r in rows.iterrows():
+        activities.append({
+            "pat_id": str(r.get("PAT ID", "")),
+            "activity_name": str(r.get("Activity Name", "")),
+            "start_date": str(r.get("Start Date & Time", "")),
+            "end_date": str(r.get("End Date & Time", "")),
+            "status": str(r.get("Activity Status", "")),
+        })
+    return activities

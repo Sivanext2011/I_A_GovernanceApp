@@ -29,12 +29,13 @@ async def preview_missing_savings_mail(req: MissingSavingsMailRequest):
         records = [r for r in records if r["signum"] in req.signums or r["email"] in req.signums]
     previews = []
     for rec in records:
-        body = _build_missing_savings_html(rec["name"], rec["pat_count"])
+        body = _build_missing_savings_html(rec["name"], rec.get("pat_activities", []))
         previews.append({
             "signum": rec["signum"],
             "name": rec["name"],
             "email": rec["email"],
-            "subject": "Action Required: Missing Savings Submission",
+            "manager_email": rec.get("manager_email", ""),
+            "subject": "Action Required - Savings needs to be recorded in N365",
             "body": body,
             "pat_count": rec["pat_count"],
         })
@@ -43,7 +44,7 @@ async def preview_missing_savings_mail(req: MissingSavingsMailRequest):
 
 @router.post("/mail/missing-savings/send")
 async def send_missing_savings_mail(req: MissingSavingsMailRequest):
-    """Send mails to missing savings practitioners."""
+    """Send mails to missing savings practitioners with CC to manager."""
     if not graph_client.is_authenticated():
         raise HTTPException(401, "Not authenticated")
     all_months = data_store.get_available_months()
@@ -60,9 +61,13 @@ async def send_missing_savings_mail(req: MissingSavingsMailRequest):
         if not email:
             results.append({"signum": rec["signum"], "name": rec["name"], "sent": False, "reason": "No email"})
             continue
-        body = _build_missing_savings_html(rec["name"], rec["pat_count"])
-        success = graph_client.send_mail("Action Required: Missing Savings Submission", body, [email], True)
-        results.append({"signum": rec["signum"], "name": rec["name"], "email": email, "sent": success})
+        body = _build_missing_savings_html(rec["name"], rec.get("pat_activities", []))
+        cc = [rec.get("manager_email", "")] if rec.get("manager_email") else []
+        success = graph_client.send_mail(
+            "Action Required - Savings needs to be recorded in N365",
+            body, [email], True, cc=cc
+        )
+        results.append({"signum": rec["signum"], "name": rec["name"], "email": email, "cc": cc, "sent": success})
     return {"results": results}
 
 
@@ -134,11 +139,19 @@ async def upload_photo(signum: str, file: UploadFile = FastAPIFile(...)):
     return {"status": "uploaded", "signum": signum, "path": str(photo_path)}
 
 
-def _build_missing_savings_html(name: str, pat_count: int) -> str:
+def _build_missing_savings_html(name: str, pat_activities: list[dict]) -> str:
+    rows = ""
+    for act in pat_activities:
+        rows += f"<tr><td>{act['pat_id']}</td><td>{act['activity_name']}</td><td>{act['start_date']}</td><td>{act['end_date']}</td><td>{act['status']}</td></tr>"
     return f"""<p>Dear {name},</p>
-<p>Our records indicate that you have <strong>{pat_count}</strong> automation-assisted PAT activit{'y' if pat_count == 1 else 'ies'} but have not submitted corresponding savings.</p>
-<p>Please submit your savings at your earliest convenience.</p>
-<p>Best regards,<br/>Automation Governance Team</p>"""
+<p>Our review indicates that you have completed the activities listed below and marked them as automation-assisted ("Yes") in PAT. However, the corresponding savings have not yet been recorded in N365.</p>
+<p>Kindly update the savings in N365 at the earliest and confirm once completed.</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
+<tr style="background:#1F4E79;color:white;"><th>PAT ID</th><th>Activity Name</th><th>Start Date &amp; Time</th><th>End Date &amp; Time</th><th>Activity Status</th></tr>
+{rows}
+</table>
+<br/>
+<p>Regards,<br/>R. Siva</p>"""
 
 
 def _build_escalation_html(mgr_name: str, members: list[dict], escalation_type: str) -> str:

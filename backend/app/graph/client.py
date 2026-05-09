@@ -103,7 +103,7 @@ class GraphClient:
             return photo_path
         return None
 
-    def send_mail(self, subject: str, body: str, recipients: list[str], is_html: bool = True) -> bool:
+    def send_mail(self, subject: str, body: str, recipients: list[str], is_html: bool = True, cc: list[str] = None) -> bool:
         token = self.get_token_silent()
         if not token:
             logger.error("No token available for sending mail")
@@ -115,6 +115,8 @@ class GraphClient:
                 "toRecipients": [{"emailAddress": {"address": r}} for r in recipients],
             }
         }
+        if cc:
+            message["message"]["ccRecipients"] = [{"emailAddress": {"address": r}} for r in cc if r]
         try:
             resp = requests.post(
                 f"{settings.GRAPH_API_ENDPOINT}/me/sendMail",

@@ -59,7 +59,7 @@ export function SavingsPercentTrend({ months, values }: SavingsPctProps) {
       <h3 className="text-sm font-semibold mb-2">Savings % Trend</h3>
       <Plot
         data={[{ x: months, y: values, type: 'scatter', mode: 'lines+markers', fill: 'tozeroy', line: { color: '#8b5cf6', width: 3 }, fillcolor: 'rgba(139,92,246,0.1)' }]}
-        layout={{ ...theme, margin: { t: 20, r: 20, b: 40, l: 60 }, yaxis: { ...theme.yaxis, title: '%' }, autosize: true }}
+        layout={{ ...theme, margin: { t: 20, r: 20, b: 40, l: 60 }, yaxis: { ...theme.yaxis, title: { text: '%' } }, autosize: true }}
         config={{ responsive: true, displayModeBar: false }}
         style={{ width: '100%', height: '300px' }}
       />
@@ -84,7 +84,7 @@ export function DepartmentComparison({ teams, total_savings, savings_percent }: 
           { x: teams, y: total_savings, type: 'bar', name: 'Total Savings', marker: { color: '#3b82f6' } },
           { x: teams, y: savings_percent, type: 'scatter', mode: 'lines+markers', name: 'Savings %', yaxis: 'y2', line: { color: '#ef4444', width: 2 } },
         ]}
-        layout={{ ...theme, margin: { t: 20, r: 60, b: 40, l: 60 }, xaxis: { ...theme.xaxis, type: 'category' }, yaxis2: { overlaying: 'y', side: 'right', title: '%', gridcolor: 'transparent' }, barmode: 'group', autosize: true }}
+        layout={{ ...theme, margin: { t: 20, r: 60, b: 40, l: 60 }, xaxis: { ...theme.xaxis, type: 'category' }, yaxis2: { overlaying: 'y', side: 'right', title: { text: '%' }, gridcolor: 'transparent' }, barmode: 'group', autosize: true }}
         config={{ responsive: true, displayModeBar: false }}
         style={{ width: '100%', height: '300px' }}
       />

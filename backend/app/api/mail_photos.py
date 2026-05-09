@@ -1,19 +1,159 @@
 """Mail and photo API endpoints."""
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File as FastAPIFile
 from fastapi.responses import FileResponse, Response
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 from app.config import settings
 from app.graph import graph_client
-from app.models.schemas import MailRequest, PendingFeedbackMailRequest, TokenRequest
+from app.models.schemas import MailRequest, PendingFeedbackMailRequest, MissingSavingsMailRequest, EscalateRequest, TokenRequest
 from app.services.data_service import data_store
-from app.governance import get_pending_feedback
+from app.governance import get_pending_feedback, get_missing_savings
 from app.utils import get_logger
 
 router = APIRouter(prefix="/api", tags=["mail", "photos"])
 logger = get_logger(__name__)
+
+
+@router.post("/mail/missing-savings/preview")
+async def preview_missing_savings_mail(req: MissingSavingsMailRequest):
+    """Preview mails for missing savings practitioners."""
+    all_months = data_store.get_available_months()
+    records = get_missing_savings(
+        req.pat_months or all_months,
+        req.savings_months or all_months,
+        req.team
+    )
+    if req.signums:
+        records = [r for r in records if r["signum"] in req.signums or r["email"] in req.signums]
+    previews = []
+    for rec in records:
+        body = _build_missing_savings_html(rec["name"], rec["pat_count"])
+        previews.append({
+            "signum": rec["signum"],
+            "name": rec["name"],
+            "email": rec["email"],
+            "subject": "Action Required: Missing Savings Submission",
+            "body": body,
+            "pat_count": rec["pat_count"],
+        })
+    return {"count": len(previews), "previews": previews}
+
+
+@router.post("/mail/missing-savings/send")
+async def send_missing_savings_mail(req: MissingSavingsMailRequest):
+    """Send mails to missing savings practitioners."""
+    if not graph_client.is_authenticated():
+        raise HTTPException(401, "Not authenticated")
+    all_months = data_store.get_available_months()
+    records = get_missing_savings(
+        req.pat_months or all_months,
+        req.savings_months or all_months,
+        req.team
+    )
+    if req.signums:
+        records = [r for r in records if r["signum"] in req.signums or r["email"] in req.signums]
+    results = []
+    for rec in records:
+        email = rec["email"]
+        if not email:
+            results.append({"signum": rec["signum"], "name": rec["name"], "sent": False, "reason": "No email"})
+            continue
+        body = _build_missing_savings_html(rec["name"], rec["pat_count"])
+        success = graph_client.send_mail("Action Required: Missing Savings Submission", body, [email], True)
+        results.append({"signum": rec["signum"], "name": rec["name"], "email": email, "sent": success})
+    return {"results": results}
+
+
+@router.post("/mail/escalate")
+async def escalate_to_manager(req: EscalateRequest):
+    """Escalate to manager: sends mail with defaulter list from their team."""
+    if not graph_client.is_authenticated():
+        raise HTTPException(401, "Not authenticated")
+    if data_store.mapping is None:
+        raise HTTPException(400, "Mapping data not loaded")
+
+    # Find manager info from mapping using supervisor personal no
+    results = []
+    # Group signums by manager
+    manager_groups: dict[str, list[dict]] = {}
+    for signum in req.signums:
+        match = data_store.mapping[
+            data_store.mapping["Corporate ID"].str.strip().str.lower() == signum.strip().lower()
+        ]
+        if match.empty:
+            continue
+        row = match.iloc[0]
+        supervisor_no = str(row.get("Supervisor Personal No.", "")).strip()
+        if not supervisor_no:
+            continue
+        if supervisor_no not in manager_groups:
+            manager_groups[supervisor_no] = []
+        manager_groups[supervisor_no].append({
+            "signum": signum,
+            "name": str(row.get("Emp Name", signum)),
+            "email": str(row.get("Ericsson Email Address", "")),
+        })
+
+    for supervisor_no, members in manager_groups.items():
+        # Find manager email from mapping
+        mgr_match = data_store.mapping[
+            data_store.mapping["Pers.no."].astype(str).str.strip() == supervisor_no
+        ]
+        if mgr_match.empty:
+            results.append({"manager": supervisor_no, "sent": False, "reason": "Manager not found in mapping"})
+            continue
+        mgr_email = str(mgr_match.iloc[0].get("Ericsson Email Address", ""))
+        mgr_name = str(mgr_match.iloc[0].get("Emp Name", ""))
+        if not mgr_email:
+            results.append({"manager": supervisor_no, "sent": False, "reason": "Manager email not found"})
+            continue
+
+        body = _build_escalation_html(mgr_name, members, req.escalation_type)
+        subject = f"Escalation: Team Members with {req.escalation_type.replace('_', ' ').title()}"
+        success = graph_client.send_mail(subject, body, [mgr_email], True)
+        results.append({"manager": mgr_name, "manager_email": mgr_email, "members": len(members), "sent": success})
+
+    return {"results": results}
+
+
+@router.post("/photos/upload/{signum}")
+async def upload_photo(signum: str, file: UploadFile = FastAPIFile(...)):
+    """Upload a photo for a practitioner."""
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(400, "File must be an image")
+    photo_path = settings.PHOTO_DIR / f"{signum}.jpg"
+    contents = await file.read()
+    # Convert to JPEG
+    from io import BytesIO
+    img = Image.open(BytesIO(contents))
+    img = img.convert("RGB")
+    img.thumbnail((400, 400))
+    img.save(photo_path, "JPEG", quality=85)
+    return {"status": "uploaded", "signum": signum, "path": str(photo_path)}
+
+
+def _build_missing_savings_html(name: str, pat_count: int) -> str:
+    return f"""<p>Dear {name},</p>
+<p>Our records indicate that you have <strong>{pat_count}</strong> automation-assisted PAT activit{'y' if pat_count == 1 else 'ies'} but have not submitted corresponding savings.</p>
+<p>Please submit your savings at your earliest convenience.</p>
+<p>Best regards,<br/>Automation Governance Team</p>"""
+
+
+def _build_escalation_html(mgr_name: str, members: list[dict], escalation_type: str) -> str:
+    issue = "missing savings submissions" if escalation_type == "missing_savings" else "pending feedback (overdue)"
+    rows = ""
+    for m in members:
+        rows += f"<tr><td>{m['name']}</td><td>{m['signum']}</td><td>{m['email']}</td></tr>"
+    return f"""<p>Dear {mgr_name},</p>
+<p>This is an escalation notice. The following team member(s) have <strong>{issue}</strong> that require attention:</p>
+<table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
+<tr style="background:#1F4E79;color:white;"><th>Name</th><th>Signum</th><th>Email</th></tr>
+{rows}
+</table>
+<p>Please follow up with them to ensure compliance.</p>
+<p>Best regards,<br/>Automation Governance Team</p>"""
 
 
 @router.post("/mail/send")

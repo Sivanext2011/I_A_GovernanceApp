@@ -1,7 +1,11 @@
 import { motion } from 'framer-motion'
+import { Upload } from 'lucide-react'
 import { useLeaderboard } from '@/hooks/useData'
 import { Skeleton } from '@/components/ui'
 import { formatNumber } from '@/lib/utils'
+import { uploadPhoto } from '@/services/api'
+import { useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface LeaderEntry {
   signum: string
@@ -52,6 +56,19 @@ function LeaderCard({ entry, index }: { entry: LeaderEntry; index: number }) {
     'from-primary-400 to-primary-600',
     'from-accent-400 to-accent-600',
   ]
+  const fileRef = useRef<HTMLInputElement>(null)
+  const queryClient = useQueryClient()
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      await uploadPhoto(entry.signum, file)
+      queryClient.invalidateQueries({ queryKey: ['leaderboard'] })
+    } catch {
+      alert('Failed to upload photo')
+    }
+  }
 
   return (
     <motion.div
@@ -71,6 +88,14 @@ function LeaderCard({ entry, index }: { entry: LeaderEntry; index: number }) {
             (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(entry.name)}&background=1e40af&color=fff&size=200`
           }}
         />
+        <button
+          onClick={(e) => { e.stopPropagation(); fileRef.current?.click() }}
+          className="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-700 shadow"
+          title="Upload photo"
+        >
+          <Upload className="w-3 h-3" />
+        </button>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
       </div>
 
       {/* Name */}

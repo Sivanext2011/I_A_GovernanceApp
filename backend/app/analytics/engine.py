@@ -91,6 +91,8 @@ def compute_monthly_trend(team: str = "Overall") -> dict:
 def compute_department_comparison(months: list[str]) -> dict:
     from app.utils.departments import TEAMS
     teams = [t for t in TEAMS if t != "Overall"]
+    if not months:
+        months = data_store.get_available_months()
     result = {"teams": teams, "total_savings": [], "savings_percent": [], "downloads": []}
     for t in teams:
         kpis = compute_kpis(months, t)
@@ -112,12 +114,22 @@ def compute_downloads_vs_reuse(team: str = "Overall") -> dict:
 
 
 def compute_pending_feedback_trend(team: str = "Overall") -> dict:
-    """Pending feedback = all overdue records (no month breakdown). Show total as single value."""
+    """Return stored monthly pending feedback records."""
+    from app.services.pending_trend_store import pending_trend_store
+    records = pending_trend_store.get_records(team)
+    months = [r["month"] for r in records]
+    pending = [r["count"] for r in records]
+    return {"months": months, "pending": pending}
+
+
+def record_pending_feedback_snapshot(team: str = "Overall") -> dict:
+    """Take a snapshot of current pending feedback count and store it."""
+    from app.services.pending_trend_store import pending_trend_store
     all_download = _filter_by_team(data_store.download, team)
     total_pending = 0
     if not all_download.empty:
         total_pending = int(all_download[all_download["Overdue Duration"] > 0].shape[0])
-    return {"months": ["Current"], "pending": [total_pending]}
+    return pending_trend_store.record(team, total_pending)
 
 
 def compute_leaderboard(months: list[str], team: str = "Overall", top_n: int = 5) -> list[dict]:

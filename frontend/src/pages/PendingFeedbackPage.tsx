@@ -1,8 +1,8 @@
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Clock, Mail, Eye, Send, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react'
+import { Clock, Mail, Eye, Send, CheckSquare, Square, ChevronDown, ChevronRight, ArrowUpCircle } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
-import { getPendingFeedback, previewPendingFeedbackMail, sendPendingFeedbackMail } from '@/services/api'
+import { getPendingFeedback, previewPendingFeedbackMail, sendPendingFeedbackMail, escalateToManager } from '@/services/api'
 import { TeamTabs, EmptyState, Skeleton } from '@/components/ui'
 import { useState, useMemo } from 'react'
 
@@ -90,6 +90,15 @@ export default function PendingFeedbackPage() {
     onError: () => alert('Failed to send mails. Check authentication.'),
   })
 
+  const escalateMutation = useMutation({
+    mutationFn: () => escalateToManager(Array.from(selected), 'pending_feedback'),
+    onSuccess: (res) => {
+      const sent = res.results.filter((r: any) => r.sent).length
+      alert(`Escalation sent to ${sent} manager(s)`)
+    },
+    onError: () => alert('Escalation failed. Check authentication.'),
+  })
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 mb-2">
@@ -133,6 +142,14 @@ export default function PendingFeedbackPage() {
               >
                 <Send className="w-4 h-4" />
                 {sendMutation.isPending ? 'Sending...' : `Send (${selected.size})`}
+              </button>
+              <button
+                onClick={() => escalateMutation.mutate()}
+                disabled={selected.size === 0 || escalateMutation.isPending}
+                className="btn-danger flex items-center gap-2 text-sm disabled:opacity-50"
+              >
+                <ArrowUpCircle className="w-4 h-4" />
+                {escalateMutation.isPending ? 'Escalating...' : 'Escalate'}
               </button>
             </div>
           </div>

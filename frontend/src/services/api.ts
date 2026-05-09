@@ -57,6 +57,24 @@ export const previewPendingFeedbackMail = (signums: string[], team: string) =>
 export const sendPendingFeedbackMail = (signums: string[], team: string) =>
   api.post('/mail/pending-feedback/send', { signums, team }).then(r => r.data)
 
+export const previewMissingSavingsMail = (signums: string[], team: string, patMonths: string[] = [], savingsMonths: string[] = []) =>
+  api.post('/mail/missing-savings/preview', { signums, team, pat_months: patMonths, savings_months: savingsMonths }).then(r => r.data)
+
+export const sendMissingSavingsMail = (signums: string[], team: string, patMonths: string[] = [], savingsMonths: string[] = []) =>
+  api.post('/mail/missing-savings/send', { signums, team, pat_months: patMonths, savings_months: savingsMonths }).then(r => r.data)
+
+export const escalateToManager = (signums: string[], escalationType: string) =>
+  api.post('/mail/escalate', { signums, escalation_type: escalationType }).then(r => r.data)
+
+export const uploadPhoto = (signum: string, file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return api.post(`/photos/upload/${signum}`, form).then(r => r.data)
+}
+
+export const recordPendingTrend = (team: string) =>
+  api.post('/dashboard/charts/pending-feedback-trend/record', null, { params: { team } }).then(r => r.data)
+
 export const getAuthStatus = () => api.get('/auth/status').then(r => r.data)
 export const startDeviceFlow = () => api.post('/auth/device-flow').then(r => r.data)
 export const setGraphToken = (token: string) => api.post('/auth/token', { token }).then(r => r.data)

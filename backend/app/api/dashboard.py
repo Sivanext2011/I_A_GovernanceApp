@@ -6,7 +6,8 @@ from typing import Optional
 from app.analytics import (
     compute_kpis, compute_ytd_kpis, compute_monthly_trend,
     compute_department_comparison, compute_downloads_vs_reuse,
-    compute_pending_feedback_trend, compute_leaderboard
+    compute_pending_feedback_trend, compute_leaderboard,
+    record_pending_feedback_snapshot
 )
 from app.services.data_service import data_store
 from app.utils.departments import TEAMS
@@ -57,6 +58,12 @@ async def get_downloads_vs_reuse(team: str = Query("Overall")):
 @router.get("/charts/pending-feedback-trend")
 async def get_pending_trend(team: str = Query("Overall")):
     return compute_pending_feedback_trend(team)
+
+
+@router.post("/charts/pending-feedback-trend/record")
+async def record_pending_trend(team: str = Query("Overall")):
+    """Record current pending feedback count for this month."""
+    return record_pending_feedback_snapshot(team)
 
 
 @router.get("/leaderboard")

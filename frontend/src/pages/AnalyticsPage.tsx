@@ -1,15 +1,28 @@
-import { BarChart3, Download, TrendingUp, DollarSign, Clock } from 'lucide-react'
+import { BarChart3, Download, TrendingUp, DollarSign, Clock, Save } from 'lucide-react'
 import { KPICard, TeamTabs, MonthMultiSelect, KPISkeleton } from '@/components/ui'
 import { MonthlySavingsTrend, SavingsPercentTrend, DepartmentComparison, DownloadsVsReuse, PendingFeedbackChart } from '@/charts/Charts'
 import { useYTDKPIs, useMonthlyTrend, useDeptComparison, useDownloadsVsReuse, usePendingTrend, useMonths } from '@/hooks/useData'
+import { recordPendingTrend } from '@/services/api'
+import { useAppStore } from '@/store/useAppStore'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 export default function AnalyticsPage() {
   const { data: monthsData } = useMonths()
+  const { selectedTeam } = useAppStore()
   const { data: ytd, isLoading } = useYTDKPIs()
   const { data: trend } = useMonthlyTrend()
   const { data: deptComp } = useDeptComparison()
   const { data: dlReuse } = useDownloadsVsReuse()
   const { data: pendingTrend } = usePendingTrend()
+  const queryClient = useQueryClient()
+
+  const recordMutation = useMutation({
+    mutationFn: () => recordPendingTrend(selectedTeam),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-trend'] })
+      alert('Pending feedback count recorded for this month')
+    },
+  })
 
   return (
     <div className="space-y-6">
@@ -42,6 +55,18 @@ export default function AnalyticsPage() {
         {deptComp && <DepartmentComparison teams={deptComp.teams} total_savings={deptComp.total_savings} savings_percent={deptComp.savings_percent} />}
         {dlReuse && <DownloadsVsReuse months={dlReuse.months} downloads={dlReuse.downloads} reuse={dlReuse.reuse} />}
         {pendingTrend && <PendingFeedbackChart months={pendingTrend.months} pending={pendingTrend.pending} />}
+      </div>
+
+      {/* Record pending feedback snapshot */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => recordMutation.mutate()}
+          disabled={recordMutation.isPending}
+          className="btn-secondary flex items-center gap-2 text-sm"
+        >
+          <Save className="w-4 h-4" />
+          {recordMutation.isPending ? 'Recording...' : 'Record Pending Feedback Count'}
+        </button>
       </div>
     </div>
   )

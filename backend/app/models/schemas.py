@@ -77,6 +77,18 @@ class PendingFeedbackMailRequest(BaseModel):
     team: str = "Overall"
 
 
+class MissingSavingsMailRequest(BaseModel):
+    signums: list[str] = []  # empty = all
+    team: str = "Overall"
+    pat_months: list[str] = []
+    savings_months: list[str] = []
+
+
+class EscalateRequest(BaseModel):
+    signums: list[str]
+    escalation_type: str = "missing_savings"  # or "pending_feedback"
+
+
 class TokenRequest(BaseModel):
     token: str
 

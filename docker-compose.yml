@@ -6,13 +6,13 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ~/app-data/uploads:/app/uploads
-      - ~/app-data/exports:/app/exports
-      - ~/app-data/photos:/app/photos
-      - ~/app-data/logs:/app/logs
+      - app-uploads:/app/uploads
+      - app-exports:/app/exports
+      - app-photos:/app/photos
+      - app-logs:/app/logs
     environment:
-      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
-      - AZURE_TENANT_ID=${AZURE_TENANT_ID}
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
+      - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}
     restart: unless-stopped
 
   frontend:
@@ -22,3 +22,9 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  app-uploads:
+  app-exports:
+  app-photos:
+  app-logs:

@@ -201,12 +201,14 @@ async def preview_pending_feedback_mail(req: PendingFeedbackMailRequest):
     for signum, items in grouped.items():
         email = items[0]["email"]
         name = items[0]["name"]
+        manager_email = _get_manager_email_by_signum(signum)
         body = _build_pending_feedback_html(name, items)
         previews.append({
             "signum": signum,
             "name": name,
             "email": email,
-            "subject": "Action Required: Pending Feedback Overdue",
+            "manager_email": manager_email,
+            "subject": "Action Required - Pending Feedback",
             "body": body,
             "item_count": len(items),
         })
@@ -215,7 +217,7 @@ async def preview_pending_feedback_mail(req: PendingFeedbackMailRequest):
 
 @router.post("/mail/pending-feedback/send")
 async def send_pending_feedback_mail(req: PendingFeedbackMailRequest):
-    """Send grouped mails: one per practitioner."""
+    """Send grouped mails: one per practitioner with CC to manager."""
     if not graph_client.is_authenticated():
         raise HTTPException(401, "Not authenticated with Microsoft Graph. Please authenticate first.")
     records = get_pending_feedback(req.team)
@@ -229,9 +231,11 @@ async def send_pending_feedback_mail(req: PendingFeedbackMailRequest):
         if not email:
             results.append({"signum": signum, "name": name, "sent": False, "reason": "No email"})
             continue
+        manager_email = _get_manager_email_by_signum(signum)
+        cc = [manager_email] if manager_email else []
         body = _build_pending_feedback_html(name, items)
-        success = graph_client.send_mail("Action Required: Pending Feedback Overdue", body, [email], True)
-        results.append({"signum": signum, "name": name, "email": email, "sent": success})
+        success = graph_client.send_mail("Action Required - Pending Feedback", body, [email], True, cc=cc)
+        results.append({"signum": signum, "name": name, "email": email, "cc": cc, "sent": success})
     return {"results": results}
 
 
@@ -248,14 +252,35 @@ def _group_by_practitioner(records: list[dict]) -> dict:
 def _build_pending_feedback_html(name: str, items: list[dict]) -> str:
     rows = ""
     for item in items:
-        rows += f"<tr><td>{item['feedback_id']}</td><td>{item['asset_name']}</td><td>{item['due_date']}</td><td>{item['overdue_duration']} days</td></tr>"
+        rows += f"<tr><td>{item['feedback_id']}</td><td>{item.get('asset_registry_id', '')}</td><td>{item['asset_name']}</td><td>{item.get('download_date', '')}</td><td>{item['due_date']}</td><td>{item['overdue_duration']}</td></tr>"
     return f"""<p>Dear {name},</p>
-<p>You have <strong>{len(items)}</strong> overdue feedback item(s). Please take action at your earliest convenience.</p>
+<p>Below assets are pending feedback beyond due date:</p>
 <table border="1" cellpadding="6" cellspacing="0" style="border-collapse:collapse;font-size:13px;">
-<tr style="background:#1F4E79;color:white;"><th>Feedback ID</th><th>Asset Name</th><th>Due Date</th><th>Overdue</th></tr>
+<tr style="background:#1F4E79;color:white;"><th>Feedback Id</th><th>Asset Registry Id</th><th>Asset Name</th><th>Download Date</th><th>Due Date</th><th>Overdue</th></tr>
 {rows}
 </table>
-<p>Best regards,<br/>Automation Governance Team</p>"""
+<br/>
+<p>Kindly update or cancel.</p>
+<p>Regards,<br/>R. Siva</p>"""
+
+
+def _get_manager_email_by_signum(signum: str) -> str:
+    if data_store.mapping is None or data_store.mapping.empty:
+        return ""
+    match = data_store.mapping[
+        data_store.mapping["Corporate ID"].str.strip().str.lower() == str(signum).strip().lower()
+    ]
+    if match.empty:
+        return ""
+    supervisor_no = str(match.iloc[0].get("Supervisor Personal No.", "")).strip()
+    if not supervisor_no:
+        return ""
+    mgr_match = data_store.mapping[
+        data_store.mapping["Pers.no."].astype(str).str.strip() == supervisor_no
+    ]
+    if mgr_match.empty:
+        return ""
+    return str(mgr_match.iloc[0].get("Ericsson Email Address", ""))
 
 
 @router.get("/auth/status")

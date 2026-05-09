@@ -8,6 +8,7 @@ import { useState, useMemo } from 'react'
 
 interface FeedbackRecord {
   feedback_id: string
+  asset_registry_id: string
   asset_name: string
   signum: string
   name: string
@@ -194,7 +195,9 @@ export default function PendingFeedbackPage() {
                       <thead>
                         <tr className="text-left text-[var(--text-secondary)]">
                           <th className="pb-2">Feedback ID</th>
+                          <th className="pb-2">Asset Registry Id</th>
                           <th className="pb-2">Asset Name</th>
+                          <th className="pb-2">Download Date</th>
                           <th className="pb-2">Due Date</th>
                           <th className="pb-2">Overdue</th>
                         </tr>
@@ -203,9 +206,11 @@ export default function PendingFeedbackPage() {
                         {items.map((item) => (
                           <tr key={item.feedback_id} className="border-t border-[var(--border)]">
                             <td className="py-2">{item.feedback_id}</td>
+                            <td className="py-2">{item.asset_registry_id}</td>
                             <td className="py-2">{item.asset_name}</td>
+                            <td className="py-2">{item.download_date}</td>
                             <td className="py-2">{item.due_date}</td>
-                            <td className="py-2 text-rose-500 font-medium">{item.overdue_duration} days</td>
+                            <td className="py-2 text-rose-500 font-medium">{item.overdue_duration}</td>
                           </tr>
                         ))}
                       </tbody>

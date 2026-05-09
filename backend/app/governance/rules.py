@@ -91,6 +91,7 @@ def get_pending_feedback(team: str = "Overall") -> list[dict]:
         name, email, dept = _enrich_practitioner(signum)
         results.append({
             "feedback_id": str(row.get("Feedback Id", "")),
+            "asset_registry_id": str(row.get("Asset Registry Id", "")),
             "asset_name": str(row.get("Asset Name", "")),
             "signum": signum,
             "name": name,

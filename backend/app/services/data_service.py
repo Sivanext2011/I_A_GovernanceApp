@@ -94,6 +94,15 @@ class DataStore:
         )
         df["Automation Saving"] = pd.to_numeric(df["Automation Saving"], errors="coerce").fillna(0)
         df["Reuse Saving"] = pd.to_numeric(df["Reuse Saving"], errors="coerce").fillna(0)
+        # Apply persistent overrides
+        from app.services.savings_override_store import savings_override_store
+        overrides = savings_override_store.get_overrides()
+        if overrides and "Feedback Id" in df.columns:
+            for fid, vals in overrides.items():
+                mask = df["Feedback Id"].astype(str) == str(fid)
+                if mask.any():
+                    df.loc[mask, "Reuse Saving"] = vals["reuse_saving"]
+                    df.loc[mask, "Automation Saving"] = vals["automation_saving"]
         df["TotalSaving"] = df["Automation Saving"] + df["Reuse Saving"]
         self.savings = df
 

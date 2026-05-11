@@ -154,3 +154,38 @@ async def remove_feedback_exclusions(feedback_ids: list[str]):
     from app.services.exclusion_store import exclusion_store
     exclusion_store.remove_feedback_ids(feedback_ids)
     return {"status": "removed", "feedback_ids": exclusion_store.get_feedback_ids()}
+
+
+@router.get("/savings-overrides")
+async def get_savings_overrides():
+    """Get all savings overrides."""
+    from app.services.savings_override_store import savings_override_store
+    return savings_override_store.get_all_list()
+
+
+@router.post("/savings-overrides")
+async def set_savings_override(data: dict):
+    """Set a savings override for a Feedback ID."""
+    from app.services.savings_override_store import savings_override_store
+    feedback_id = str(data.get("feedback_id", "")).strip()
+    reuse_saving = float(data.get("reuse_saving", 0))
+    automation_saving = float(data.get("automation_saving", 0))
+    if not feedback_id:
+        raise HTTPException(400, "feedback_id is required")
+    savings_override_store.set_override(feedback_id, reuse_saving, automation_saving)
+    # Apply to current data
+    if data_store.savings is not None and "Feedback Id" in data_store.savings.columns:
+        mask = data_store.savings["Feedback Id"].astype(str) == feedback_id
+        if mask.any():
+            data_store.savings.loc[mask, "Reuse Saving"] = reuse_saving
+            data_store.savings.loc[mask, "Automation Saving"] = automation_saving
+            data_store.savings.loc[mask, "TotalSaving"] = reuse_saving + automation_saving
+    return {"status": "set", "feedback_id": feedback_id, "reuse_saving": reuse_saving, "automation_saving": automation_saving}
+
+
+@router.delete("/savings-overrides/{feedback_id}")
+async def remove_savings_override(feedback_id: str):
+    """Remove a savings override."""
+    from app.services.savings_override_store import savings_override_store
+    savings_override_store.remove_override(feedback_id)
+    return {"status": "removed", "feedback_id": feedback_id}

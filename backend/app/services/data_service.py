@@ -99,7 +99,7 @@ class DataStore:
         overrides = savings_override_store.get_overrides()
         if overrides and "Feedback Id" in df.columns:
             for fid, vals in overrides.items():
-                mask = df["Feedback Id"].astype(str) == str(fid)
+                mask = df["Feedback Id"].astype(str).str.strip() == str(fid).strip()
                 if mask.any():
                     df.loc[mask, "Reuse Saving"] = vals["reuse_saving"]
                     df.loc[mask, "Automation Saving"] = vals["automation_saving"]

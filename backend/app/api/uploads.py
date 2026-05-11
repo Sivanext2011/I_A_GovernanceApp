@@ -173,13 +173,9 @@ async def set_savings_override(data: dict):
     if not feedback_id:
         raise HTTPException(400, "feedback_id is required")
     savings_override_store.set_override(feedback_id, reuse_saving, automation_saving)
-    # Apply to current data
-    if data_store.savings is not None and "Feedback Id" in data_store.savings.columns:
-        mask = data_store.savings["Feedback Id"].astype(str) == feedback_id
-        if mask.any():
-            data_store.savings.loc[mask, "Reuse Saving"] = reuse_saving
-            data_store.savings.loc[mask, "Automation Saving"] = automation_saving
-            data_store.savings.loc[mask, "TotalSaving"] = reuse_saving + automation_saving
+    # Reprocess savings data to apply override
+    if data_store.savings_raw is not None:
+        data_store._process_savings()
     return {"status": "set", "feedback_id": feedback_id, "reuse_saving": reuse_saving, "automation_saving": automation_saving}
 
 

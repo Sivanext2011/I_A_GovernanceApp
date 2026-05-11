@@ -98,11 +98,18 @@ class DataStore:
         from app.services.savings_override_store import savings_override_store
         overrides = savings_override_store.get_overrides()
         if overrides and "Feedback Id" in df.columns:
+            df["_fid_str"] = df["Feedback Id"].astype(str).str.strip().str.split(".").str[0]
             for fid, vals in overrides.items():
-                mask = df["Feedback Id"].astype(str).str.strip() == str(fid).strip()
-                if mask.any():
+                fid_clean = str(fid).strip().split(".")[0]
+                mask = df["_fid_str"] == fid_clean
+                matched = mask.sum()
+                if matched > 0:
                     df.loc[mask, "Reuse Saving"] = vals["reuse_saving"]
                     df.loc[mask, "Automation Saving"] = vals["automation_saving"]
+                    logger.info(f"Override applied: Feedback Id {fid} -> {matched} rows updated")
+                else:
+                    logger.warning(f"Override not matched: Feedback Id {fid} (0 rows found)")
+            df.drop(columns=["_fid_str"], inplace=True)
         df["TotalSaving"] = df["Automation Saving"] + df["Reuse Saving"]
         self.savings = df
 
@@ -153,21 +160,30 @@ class DataStore:
         if not upload_dir.exists():
             return
 
-        file_loaders = {
-            "pat.xlsx": self.load_pat,
-            "data1.xlsx": self.load_mapping,
-            "savings.xlsx": self.load_savings,
-            "download.xlsx": self.load_download,
-        }
+        # Try to load each file type by finding the most recent matching file
+        for filepath in sorted(upload_dir.glob("*.xlsx"), key=lambda f: f.stat().st_mtime, reverse=True):
+            try:
+                # Try to detect file type by reading sheet names
+                xl = pd.ExcelFile(filepath)
+                sheets = xl.sheet_names
 
-        for filename, loader in file_loaders.items():
-            filepath = upload_dir / filename
-            if filepath.exists():
-                try:
-                    loader(filepath)
-                    logger.info(f"Auto-loaded {filename}")
-                except Exception as e:
-                    logger.warning(f"Failed to auto-load {filename}: {e}")
+                if "PAT Details" in sheets and self.pat is None:
+                    self.load_pat(filepath)
+                    logger.info(f"Auto-loaded PAT: {filepath.name}")
+                elif "Export" in sheets and self.mapping is None:
+                    self.load_mapping(filepath)
+                    logger.info(f"Auto-loaded Mapping: {filepath.name}")
+                elif "Savings - Line Manager" in sheets and self.savings is None:
+                    self.load_savings(filepath)
+                    logger.info(f"Auto-loaded Savings: {filepath.name}")
+                elif self.download is None:
+                    # Try as download file
+                    df = pd.read_excel(filepath, nrows=0)
+                    if "Feedback Id" in df.columns and "Overdue Duration" in df.columns:
+                        self.load_download(filepath)
+                        logger.info(f"Auto-loaded Download: {filepath.name}")
+            except Exception as e:
+                logger.debug(f"Skipped {filepath.name}: {e}")
 
 
 # Singleton

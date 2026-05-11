@@ -313,10 +313,11 @@ async def set_access_token(req: TokenRequest):
 
 @router.get("/photos/{signum}")
 async def get_photo(signum: str):
+    from fastapi.responses import Response as FastResponse
     # Check local cache first
     photo_path = settings.PHOTO_DIR / f"{signum}.jpg"
     if photo_path.exists():
-        return FileResponse(photo_path, media_type="image/jpeg")
+        return FileResponse(photo_path, media_type="image/jpeg", headers={"Cache-Control": "no-cache, max-age=0"})
 
     # Try Graph API
     if graph_client.is_authenticated() and data_store.mapping is not None:

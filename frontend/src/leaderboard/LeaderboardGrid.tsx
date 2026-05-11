@@ -81,7 +81,7 @@ function LeaderCard({ entry, index }: { entry: LeaderEntry; index: number }) {
       {/* Photo */}
       <div className={`relative w-20 h-20 rounded-full bg-gradient-to-br ${gradients[index]} p-0.5 mb-4 group-hover:animate-glow`}>
         <img
-          src={entry.photo_url}
+          src={`${entry.photo_url}?t=${Date.now()}`}
           alt={entry.name}
           className="w-full h-full rounded-full object-cover bg-slate-200 dark:bg-slate-700"
           onError={(e) => {

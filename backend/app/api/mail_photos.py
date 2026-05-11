@@ -126,7 +126,11 @@ async def escalate_to_manager(req: EscalateRequest):
 @router.post("/photos/upload/{signum}")
 async def upload_photo(signum: str, file: UploadFile = FastAPIFile(...)):
     """Upload a photo for a practitioner."""
-    if not file.content_type or not file.content_type.startswith("image/"):
+    allowed_ext = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".jfif"}
+    from pathlib import PurePath
+    ext = PurePath(file.filename).suffix.lower() if file.filename else ""
+    is_image = (file.content_type and file.content_type.startswith("image/")) or ext in allowed_ext
+    if not is_image:
         raise HTTPException(400, "File must be an image")
     photo_path = settings.PHOTO_DIR / f"{signum}.jpg"
     contents = await file.read()

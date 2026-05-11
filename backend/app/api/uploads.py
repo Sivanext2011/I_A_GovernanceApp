@@ -109,3 +109,48 @@ async def exclude_download_records(feedback_ids: list[str]):
     removed = before - len(data_store.download)
     logger.info(f"Excluded {removed} Download records")
     return {"removed": removed, "remaining": len(data_store.download)}
+
+
+@router.get("/exclusions")
+async def get_exclusions():
+    """Get the persistent exclusion list."""
+    from app.services.exclusion_store import exclusion_store
+    return exclusion_store.get_all()
+
+
+@router.post("/exclusions/pat")
+async def add_pat_exclusions(pat_ids: list[str]):
+    """Add PAT IDs to permanent exclusion list."""
+    from app.services.exclusion_store import exclusion_store
+    exclusion_store.add_pat_ids(pat_ids)
+    # Also remove from current data
+    if data_store.pat is not None:
+        data_store.pat = data_store.pat[~data_store.pat["PAT ID"].astype(str).isin(pat_ids)]
+    return {"status": "added", "pat_ids": exclusion_store.get_pat_ids()}
+
+
+@router.post("/exclusions/feedback")
+async def add_feedback_exclusions(feedback_ids: list[str]):
+    """Add Feedback IDs to permanent exclusion list."""
+    from app.services.exclusion_store import exclusion_store
+    exclusion_store.add_feedback_ids(feedback_ids)
+    # Also remove from current data
+    if data_store.download is not None:
+        data_store.download = data_store.download[~data_store.download["Feedback Id"].astype(str).isin(feedback_ids)]
+    return {"status": "added", "feedback_ids": exclusion_store.get_feedback_ids()}
+
+
+@router.delete("/exclusions/pat")
+async def remove_pat_exclusions(pat_ids: list[str]):
+    """Remove PAT IDs from exclusion list."""
+    from app.services.exclusion_store import exclusion_store
+    exclusion_store.remove_pat_ids(pat_ids)
+    return {"status": "removed", "pat_ids": exclusion_store.get_pat_ids()}
+
+
+@router.delete("/exclusions/feedback")
+async def remove_feedback_exclusions(feedback_ids: list[str]):
+    """Remove Feedback IDs from exclusion list."""
+    from app.services.exclusion_store import exclusion_store
+    exclusion_store.remove_feedback_ids(feedback_ids)
+    return {"status": "removed", "feedback_ids": exclusion_store.get_feedback_ids()}

@@ -79,6 +79,10 @@ def _style_excel(filepath: Path):
 
 
 def export_pdf(months: list[str], team: str = "Overall") -> Path:
+    from app.services.data_service import data_store
+    from app.analytics import compute_department_comparison
+    from app.utils.departments import TEAMS
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filepath = settings.EXPORT_DIR / f"report_{team}_{timestamp}.pdf"
 
@@ -94,8 +98,10 @@ def export_pdf(months: list[str], team: str = "Overall") -> Path:
     elements.append(Paragraph(f"Team: {team} | Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", styles["Normal"]))
     elements.append(Spacer(1, 20))
 
-    # KPI Table
+    # Overall KPI Table
     kpis = compute_kpis(months, team)
+    elements.append(Paragraph("KPI Summary", styles["Heading2"]))
+    elements.append(Spacer(1, 10))
     kpi_data = [["Metric", "Value"]]
     kpi_data.append(["Total Downloads", str(kpis["total_downloads"])])
     kpi_data.append(["Total Reused with Savings", str(kpis["total_reused_with_savings"])])
@@ -118,21 +124,100 @@ def export_pdf(months: list[str], team: str = "Overall") -> Path:
     elements.append(kpi_table)
     elements.append(Spacer(1, 30))
 
-    # Leaderboard
-    lb = compute_leaderboard(months, team, top_n=5)
-    if lb:
-        elements.append(Paragraph("Top 5 Practitioners", styles["Heading2"]))
+    # Team-wise Stats Table (when Overall)
+    if team == "Overall":
+        elements.append(Paragraph("Team-wise Statistics", styles["Heading2"]))
         elements.append(Spacer(1, 10))
-        lb_data = [["Name", "Department", "Total Savings"]]
-        for entry in lb:
-            lb_data.append([entry["name"], entry["department"], f"{entry['total_savings']:,.2f}"])
-        lb_table = Table(lb_data, colWidths=[3 * inch, 2.5 * inch, 2 * inch])
+        team_data = [["Team", "Total Savings", "Savings %", "Downloads", "Pending", "Billability"]]
+        for t in [tt for tt in TEAMS if tt != "Overall"]:
+            tk = compute_kpis(months, t)
+            team_data.append([
+                t,
+                f"{tk['total_savings']:,.2f}",
+                f"{tk['savings_percent']:.2f}%" if tk["savings_percent"] else "N/A",
+                str(tk["total_downloads"]),
+                str(tk["pending_feedback"] or 0),
+                f"{tk['billability_hours']:,.2f}",
+            ])
+        team_table = Table(team_data, colWidths=[1.8 * inch, 1.5 * inch, 1.2 * inch, 1.2 * inch, 1.2 * inch, 1.5 * inch])
+        team_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F0F4F8")]),
+        ]))
+        elements.append(team_table)
+        elements.append(Spacer(1, 30))
+
+    # Current Month KPIs
+    latest = data_store.get_latest_month()
+    if latest:
+        elements.append(Paragraph(f"Current Month ({latest})", styles["Heading2"]))
+        elements.append(Spacer(1, 10))
+        curr_kpis = compute_kpis([latest], team)
+        curr_data = [["Metric", "Value"]]
+        curr_data.append(["Monthly Savings", f"{curr_kpis['total_savings']:,.2f}"])
+        curr_data.append(["Monthly Savings %", f"{curr_kpis['savings_percent']:.2f}%" if curr_kpis["savings_percent"] else "N/A"])
+        curr_data.append(["Monthly Downloads", str(curr_kpis["total_downloads"])])
+        curr_data.append(["Monthly Billability", f"{curr_kpis['billability_hours']:,.2f}"])
+        curr_table = Table(curr_data, colWidths=[3 * inch, 3 * inch])
+        curr_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2E86AB")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ]))
+        elements.append(curr_table)
+        elements.append(Spacer(1, 30))
+
+    # Monthly Trend Table
+    trend = compute_monthly_trend(team)
+    if trend["months"]:
+        elements.append(Paragraph("Monthly Trend", styles["Heading2"]))
+        elements.append(Spacer(1, 10))
+        trend_data = [["Month", "Total Savings", "Automation", "Reuse", "Savings %"]]
+        for i, m in enumerate(trend["months"]):
+            trend_data.append([
+                m,
+                f"{trend['series']['total_savings'][i]:,.2f}",
+                f"{trend['series']['automation_savings'][i]:,.2f}",
+                f"{trend['series']['reuse_savings'][i]:,.2f}",
+                f"{trend['series']['savings_percent'][i]:.2f}%",
+            ])
+        t_table = Table(trend_data, colWidths=[1.5 * inch, 1.8 * inch, 1.8 * inch, 1.8 * inch, 1.5 * inch])
+        t_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1F4E79")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ]))
+        elements.append(t_table)
+        elements.append(Spacer(1, 30))
+
+    # Full Leaderboard
+    lb = compute_leaderboard(months, team, top_n=20)
+    if lb:
+        elements.append(Paragraph("Leaderboard", styles["Heading2"]))
+        elements.append(Spacer(1, 10))
+        lb_data = [["#", "Name", "Department", "Reuse Saving", "Automation Saving", "Total Savings"]]
+        for i, entry in enumerate(lb, 1):
+            lb_data.append([
+                str(i), entry["name"], entry["department"],
+                f"{entry['reuse_saving']:,.2f}", f"{entry['automation_saving']:,.2f}",
+                f"{entry['total_savings']:,.2f}"
+            ])
+        lb_table = Table(lb_data, colWidths=[0.4 * inch, 2.2 * inch, 1.8 * inch, 1.5 * inch, 1.5 * inch, 1.5 * inch])
         lb_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#2E86AB")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F0F4F8")]),
         ]))
         elements.append(lb_table)
 

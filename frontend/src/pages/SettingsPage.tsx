@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Settings, Upload, CheckCircle, XCircle, Shield, Key } from 'lucide-react'
+import { Settings, Upload, CheckCircle, XCircle, Shield, Key, Trash2, Plus } from 'lucide-react'
 import { uploadFile, getAuthStatus, setGraphToken } from '@/services/api'
 import { useUploadStatus } from '@/hooks/useData'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query'
+import api from '@/services/api'
 
 const FILE_TYPES = [
   { key: 'pat', label: 'PAT File', desc: 'PAT Details sheet with automation activities' },
@@ -145,6 +146,120 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      {/* Exclusion List */}
+      <ExclusionManager />
+    </div>
+  )
+}
+
+function ExclusionManager() {
+  const [patId, setPatId] = useState('')
+  const [feedbackId, setFeedbackId] = useState('')
+  const queryClient = useQueryClient()
+
+  const { data: exclusions, refetch } = useQuery({
+    queryKey: ['exclusions'],
+    queryFn: () => api.get('/uploads/exclusions').then(r => r.data),
+  })
+
+  const addPatMutation = useMutation({
+    mutationFn: (ids: string[]) => api.post('/uploads/exclusions/pat', ids).then(r => r.data),
+    onSuccess: () => { refetch(); queryClient.invalidateQueries(); setPatId('') },
+  })
+
+  const addFeedbackMutation = useMutation({
+    mutationFn: (ids: string[]) => api.post('/uploads/exclusions/feedback', ids).then(r => r.data),
+    onSuccess: () => { refetch(); queryClient.invalidateQueries(); setFeedbackId('') },
+  })
+
+  const removePatMutation = useMutation({
+    mutationFn: (ids: string[]) => api.delete('/uploads/exclusions/pat', { data: ids }).then(r => r.data),
+    onSuccess: () => { refetch(); queryClient.invalidateQueries() },
+  })
+
+  const removeFeedbackMutation = useMutation({
+    mutationFn: (ids: string[]) => api.delete('/uploads/exclusions/feedback', { data: ids }).then(r => r.data),
+    onSuccess: () => { refetch(); queryClient.invalidateQueries() },
+  })
+
+  return (
+    <div className="glass-card p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <Trash2 className="w-5 h-5 text-rose-500" />
+        <h3 className="font-semibold">Permanent Exclusion List</h3>
+      </div>
+      <p className="text-xs text-[var(--text-secondary)] mb-4">
+        Records added here will be excluded from all calculations, even after re-uploading data.
+      </p>
+
+      {/* Add PAT ID */}
+      <div className="flex gap-3 mb-4">
+        <input
+          value={patId}
+          onChange={(e) => setPatId(e.target.value)}
+          placeholder="Enter PAT ID to exclude (comma-separated for multiple)"
+          className="flex-1 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-[var(--bg-secondary)] text-sm"
+        />
+        <button
+          onClick={() => addPatMutation.mutate(patId.split(',').map(s => s.trim()).filter(Boolean))}
+          disabled={!patId.trim()}
+          className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
+        >
+          <Plus className="w-4 h-4" /> Exclude PAT
+        </button>
+      </div>
+
+      {/* Add Feedback ID */}
+      <div className="flex gap-3 mb-6">
+        <input
+          value={feedbackId}
+          onChange={(e) => setFeedbackId(e.target.value)}
+          placeholder="Enter Feedback ID to exclude (comma-separated for multiple)"
+          className="flex-1 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-[var(--bg-secondary)] text-sm"
+        />
+        <button
+          onClick={() => addFeedbackMutation.mutate(feedbackId.split(',').map(s => s.trim()).filter(Boolean))}
+          disabled={!feedbackId.trim()}
+          className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
+        >
+          <Plus className="w-4 h-4" /> Exclude Feedback
+        </button>
+      </div>
+
+      {/* Current Exclusions */}
+      {exclusions && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="text-sm font-medium mb-2">Excluded PAT IDs ({exclusions.pat_ids?.length || 0})</h4>
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {exclusions.pat_ids?.map((id: string) => (
+                <div key={id} className="flex items-center justify-between text-xs bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded">
+                  <span>{id}</span>
+                  <button onClick={() => removePatMutation.mutate([id])} className="text-red-500 hover:text-red-700">
+                    <XCircle className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {(!exclusions.pat_ids || exclusions.pat_ids.length === 0) && <p className="text-xs text-[var(--text-secondary)]">None</p>}
+            </div>
+          </div>
+          <div>
+            <h4 className="text-sm font-medium mb-2">Excluded Feedback IDs ({exclusions.feedback_ids?.length || 0})</h4>
+            <div className="space-y-1 max-h-40 overflow-y-auto">
+              {exclusions.feedback_ids?.map((id: string) => (
+                <div key={id} className="flex items-center justify-between text-xs bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded">
+                  <span>{id}</span>
+                  <button onClick={() => removeFeedbackMutation.mutate([id])} className="text-red-500 hover:text-red-700">
+                    <XCircle className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              {(!exclusions.feedback_ids || exclusions.feedback_ids.length === 0) && <p className="text-xs text-[var(--text-secondary)]">None</p>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -45,6 +45,11 @@ class DataStore:
         )
         df = df[mask].copy()
         df["CanonicalMonth"] = df["Start Date & Time"].dt.to_period("M").astype(str)
+        # Apply exclusions
+        from app.services.exclusion_store import exclusion_store
+        excluded = exclusion_store.get_pat_ids()
+        if excluded:
+            df = df[~df["PAT ID"].astype(str).isin(excluded)]
         self.pat = df
 
     def load_mapping(self, filepath: Path) -> dict:
@@ -112,6 +117,11 @@ class DataStore:
             lambda r: classify_savings_download_dept(r.get("L4ORG"), r.get("L5ORG"), r.get("L6ORG")), axis=1
         )
         df["Overdue Duration"] = pd.to_numeric(df["Overdue Duration"], errors="coerce").fillna(0)
+        # Apply exclusions
+        from app.services.exclusion_store import exclusion_store
+        excluded = exclusion_store.get_feedback_ids()
+        if excluded:
+            df = df[~df["Feedback Id"].astype(str).isin(excluded)]
         self.download = df
 
     def get_available_months(self) -> list[str]:

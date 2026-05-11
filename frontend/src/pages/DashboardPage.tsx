@@ -2,10 +2,8 @@ import { Download, TrendingUp, DollarSign, Clock, BarChart3 } from 'lucide-react
 import { KPICard, TeamTabs, MonthMultiSelect, KPISkeleton, EmptyState } from '@/components/ui'
 import { MonthlySavingsTrend, SavingsPercentTrend, DepartmentComparison, DownloadsVsReuse, MultiTeamSavingsTrend, MultiTeamSavingsPctTrend } from '@/charts/Charts'
 import { LeaderboardGrid } from '@/leaderboard/LeaderboardGrid'
-import { useKPIs, useMonthlyTrend, useDeptComparison, useDownloadsVsReuse, useMonths, useTeamStats, useMonthlyTrendAllTeams } from '@/hooks/useData'
-import { useUploadStatus } from '@/hooks/useData'
+import { useKPIs, useMonthlyTrend, useDeptComparison, useDownloadsVsReuse, useMonths, useTeamStats, useMonthlyTrendAllTeams, useUploadStatus } from '@/hooks/useData'
 import { useAppStore } from '@/store/useAppStore'
-import { useQuery } from '@tanstack/react-query'
 import { formatNumber } from '@/lib/utils'
 
 export default function DashboardPage() {

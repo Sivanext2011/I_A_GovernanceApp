@@ -74,3 +74,31 @@ async def get_leaderboard(
 ):
     month_list = months.split(",") if months else data_store.get_available_months()
     return compute_leaderboard(month_list, team, top_n)
+
+
+@router.get("/team-stats")
+async def get_team_stats(months: Optional[str] = Query(None)):
+    """Get KPI stats for each team (used in Dashboard when Overall is selected)."""
+    month_list = months.split(",") if months else data_store.get_available_months()
+    teams = [t for t in TEAMS if t != "Overall"]
+    stats = []
+    for t in teams:
+        kpis = compute_kpis(month_list, t)
+        stats.append({"team": t, **kpis})
+    return stats
+
+
+@router.get("/charts/monthly-trend-all-teams")
+async def get_monthly_trend_all_teams():
+    """Monthly trend for all teams + overall."""
+    months = sorted(data_store.get_available_months())
+    result = {"months": months, "teams": {}}
+    for t in TEAMS:
+        savings = []
+        pct = []
+        for m in months:
+            kpis = compute_kpis([m], t)
+            savings.append(kpis["total_savings"])
+            pct.append(kpis["savings_percent"] or 0)
+        result["teams"][t] = {"total_savings": savings, "savings_percent": pct}
+    return result

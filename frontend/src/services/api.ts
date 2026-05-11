@@ -33,6 +33,18 @@ export const getPendingTrend = (team: string) =>
 export const getLeaderboard = (team: string, months?: string, topN = 5) =>
   api.get('/dashboard/leaderboard', { params: { team, months, top_n: topN } }).then(r => r.data)
 
+export const getTeamStats = (months?: string) =>
+  api.get('/dashboard/team-stats', { params: { months } }).then(r => r.data)
+
+export const getMonthlyTrendAllTeams = () =>
+  api.get('/dashboard/charts/monthly-trend-all-teams').then(r => r.data)
+
+export const excludePatRecords = (patIds: string[]) =>
+  api.post('/uploads/exclude/pat', patIds).then(r => r.data)
+
+export const excludeDownloadRecords = (feedbackIds: string[]) =>
+  api.post('/uploads/exclude/download', feedbackIds).then(r => r.data)
+
 export const getMissingSavings = (team: string, patMonths?: string, savingsMonths?: string) =>
   api.get('/governance/missing-savings', { params: { team, pat_months: patMonths, savings_months: savingsMonths } }).then(r => r.data)
 

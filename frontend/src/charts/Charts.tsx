@@ -34,11 +34,11 @@ export function MonthlySavingsTrend({ months, series }: TrendChartProps) {
       <h3 className="text-sm font-semibold mb-2">Monthly Savings Trend</h3>
       <Plot
         data={[
-          { x: months, y: series.total_savings, type: 'scatter', mode: 'lines+markers', name: 'Total', line: { color: '#3b82f6', width: 3 } },
-          { x: months, y: series.automation_savings, type: 'scatter', mode: 'lines+markers', name: 'Automation', line: { color: '#14b8a6', width: 2 } },
-          { x: months, y: series.reuse_savings, type: 'scatter', mode: 'lines+markers', name: 'Reuse', line: { color: '#f59e0b', width: 2 } },
+          { x: months, y: series.total_savings, type: 'bar', name: 'Total', marker: { color: '#3b82f6' } },
+          { x: months, y: series.automation_savings, type: 'bar', name: 'Automation', marker: { color: '#14b8a6' } },
+          { x: months, y: series.reuse_savings, type: 'bar', name: 'Reuse', marker: { color: '#f59e0b' } },
         ]}
-        layout={{ ...theme, margin: { t: 20, r: 20, b: 40, l: 60 }, legend: { orientation: 'h', y: -0.2 }, autosize: true }}
+        layout={{ ...theme, margin: { t: 20, r: 20, b: 40, l: 60 }, legend: { orientation: 'h', y: -0.2 }, barmode: 'group', autosize: true }}
         config={{ responsive: true, displayModeBar: false }}
         className="w-full"
         style={{ width: '100%', height: '300px' }}
@@ -58,7 +58,7 @@ export function SavingsPercentTrend({ months, values }: SavingsPctProps) {
     <div className="glass-card p-4">
       <h3 className="text-sm font-semibold mb-2">Savings % Trend</h3>
       <Plot
-        data={[{ x: months, y: values, type: 'scatter', mode: 'lines+markers', fill: 'tozeroy', line: { color: '#8b5cf6', width: 3 }, fillcolor: 'rgba(139,92,246,0.1)' }]}
+        data={[{ x: months, y: values, type: 'bar', marker: { color: '#8b5cf6' } }]}
         layout={{ ...theme, margin: { t: 20, r: 20, b: 40, l: 60 }, yaxis: { ...theme.yaxis, title: { text: '%' } }, autosize: true }}
         config={{ responsive: true, displayModeBar: false }}
         style={{ width: '100%', height: '300px' }}
@@ -131,6 +131,57 @@ export function PendingFeedbackChart({ months, pending }: PendingProps) {
         layout={{ ...theme, margin: { t: 20, r: 20, b: 40, l: 60 }, autosize: true }}
         config={{ responsive: true, displayModeBar: false }}
         style={{ width: '100%', height: '300px' }}
+      />
+    </div>
+  )
+}
+
+interface MultiTeamTrendProps {
+  months: string[]
+  teams: Record<string, { total_savings: number[]; savings_percent: number[] }>
+}
+
+const TEAM_COLORS: Record<string, string> = {
+  'Overall': '#3b82f6',
+  'Billing': '#14b8a6',
+  'Charging': '#f59e0b',
+  'SDC Billing&MW': '#8b5cf6',
+  'SDC CS&DFE': '#ef4444',
+}
+
+export function MultiTeamSavingsTrend({ months, teams }: MultiTeamTrendProps) {
+  const theme = useChartTheme()
+  const data = Object.entries(teams).map(([team, series]) => ({
+    x: months, y: series.total_savings, type: 'bar' as const, name: team,
+    marker: { color: TEAM_COLORS[team] || '#6b7280' },
+  }))
+  return (
+    <div className="glass-card p-4">
+      <h3 className="text-sm font-semibold mb-2">Monthly Savings Trend (All Teams)</h3>
+      <Plot
+        data={data}
+        layout={{ ...theme, margin: { t: 20, r: 20, b: 40, l: 60 }, legend: { orientation: 'h', y: -0.2 }, barmode: 'group', autosize: true }}
+        config={{ responsive: true, displayModeBar: false }}
+        style={{ width: '100%', height: '350px' }}
+      />
+    </div>
+  )
+}
+
+export function MultiTeamSavingsPctTrend({ months, teams }: MultiTeamTrendProps) {
+  const theme = useChartTheme()
+  const data = Object.entries(teams).map(([team, series]) => ({
+    x: months, y: series.savings_percent, type: 'bar' as const, name: team,
+    marker: { color: TEAM_COLORS[team] || '#6b7280' },
+  }))
+  return (
+    <div className="glass-card p-4">
+      <h3 className="text-sm font-semibold mb-2">Savings % Trend (All Teams)</h3>
+      <Plot
+        data={data}
+        layout={{ ...theme, margin: { t: 20, r: 20, b: 40, l: 60 }, yaxis: { ...theme.yaxis, title: { text: '%' } }, legend: { orientation: 'h', y: -0.2 }, barmode: 'group', autosize: true }}
+        config={{ responsive: true, displayModeBar: false }}
+        style={{ width: '100%', height: '350px' }}
       />
     </div>
   )

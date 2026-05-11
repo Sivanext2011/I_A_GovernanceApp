@@ -1,17 +1,23 @@
 import { Download, TrendingUp, DollarSign, Clock, BarChart3 } from 'lucide-react'
 import { KPICard, TeamTabs, MonthMultiSelect, KPISkeleton, EmptyState } from '@/components/ui'
-import { MonthlySavingsTrend, SavingsPercentTrend, DepartmentComparison, DownloadsVsReuse } from '@/charts/Charts'
+import { MonthlySavingsTrend, SavingsPercentTrend, DepartmentComparison, DownloadsVsReuse, MultiTeamSavingsTrend, MultiTeamSavingsPctTrend } from '@/charts/Charts'
 import { LeaderboardGrid } from '@/leaderboard/LeaderboardGrid'
-import { useKPIs, useMonthlyTrend, useDeptComparison, useDownloadsVsReuse, useMonths } from '@/hooks/useData'
+import { useKPIs, useMonthlyTrend, useDeptComparison, useDownloadsVsReuse, useMonths, useTeamStats, useMonthlyTrendAllTeams } from '@/hooks/useData'
 import { useUploadStatus } from '@/hooks/useData'
+import { useAppStore } from '@/store/useAppStore'
+import { useQuery } from '@tanstack/react-query'
+import { formatNumber } from '@/lib/utils'
 
 export default function DashboardPage() {
+  const { selectedTeam } = useAppStore()
   const { data: uploadStatus } = useUploadStatus()
   const { data: monthsData } = useMonths()
   const { data: kpis, isLoading: kpiLoading } = useKPIs()
   const { data: trend } = useMonthlyTrend()
   const { data: deptComp } = useDeptComparison()
   const { data: dlReuse } = useDownloadsVsReuse()
+  const { data: teamStats } = useTeamStats()
+  const { data: allTeamsTrend } = useMonthlyTrendAllTeams()
 
   const hasData = uploadStatus && (uploadStatus.pat || uploadStatus.savings || uploadStatus.download)
 
@@ -38,11 +44,51 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {trend && <MonthlySavingsTrend months={trend.months} series={trend.series} />}
-        {trend && <SavingsPercentTrend months={trend.months} values={trend.series.savings_percent} />}
-        {deptComp && <DepartmentComparison teams={deptComp.teams} total_savings={deptComp.total_savings} savings_percent={deptComp.savings_percent} />}
+      {/* Team Stats Table (only when Overall) */}
+      {selectedTeam === 'Overall' && teamStats && teamStats.length > 0 && (
+        <div className="glass-card p-4 overflow-x-auto">
+          <h3 className="text-sm font-semibold mb-3">Team-wise Statistics</h3>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[var(--text-secondary)] border-b border-[var(--border)]">
+                <th className="pb-2 pr-4">Team</th>
+                <th className="pb-2 pr-4 text-right">Total Savings</th>
+                <th className="pb-2 pr-4 text-right">Savings %</th>
+                <th className="pb-2 pr-4 text-right">Downloads</th>
+                <th className="pb-2 pr-4 text-right">Pending</th>
+                <th className="pb-2 text-right">Billability</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teamStats.map((s: any) => (
+                <tr key={s.team} className="border-b border-[var(--border)]">
+                  <td className="py-2 pr-4 font-medium">{s.team}</td>
+                  <td className="py-2 pr-4 text-right">{formatNumber(s.total_savings)}</td>
+                  <td className="py-2 pr-4 text-right">{s.savings_percent != null ? `${s.savings_percent}%` : 'N/A'}</td>
+                  <td className="py-2 pr-4 text-right">{s.total_downloads}</td>
+                  <td className="py-2 pr-4 text-right">{s.pending_feedback}</td>
+                  <td className="py-2 text-right">{formatNumber(s.billability_hours)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Charts - 1 per row */}
+      <div className="grid grid-cols-1 gap-6">
+        {selectedTeam === 'Overall' && allTeamsTrend ? (
+          <>
+            <MultiTeamSavingsTrend months={allTeamsTrend.months} teams={allTeamsTrend.teams} />
+            <MultiTeamSavingsPctTrend months={allTeamsTrend.months} teams={allTeamsTrend.teams} />
+          </>
+        ) : (
+          <>
+            {trend && <MonthlySavingsTrend months={trend.months} series={trend.series} />}
+            {trend && <SavingsPercentTrend months={trend.months} values={trend.series.savings_percent} />}
+          </>
+        )}
+        {selectedTeam === 'Overall' && deptComp && deptComp.teams?.length > 0 && <DepartmentComparison teams={deptComp.teams} total_savings={deptComp.total_savings} savings_percent={deptComp.savings_percent} />}
         {dlReuse && <DownloadsVsReuse months={dlReuse.months} downloads={dlReuse.downloads} reuse={dlReuse.reuse} />}
       </div>
 

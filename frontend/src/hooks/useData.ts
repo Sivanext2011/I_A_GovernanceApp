@@ -100,6 +100,35 @@ export function useMonths() {
   return useQuery({ queryKey: ['months'], queryFn: api.getMonths })
 }
 
+export function useTeamStats() {
+  const { selectedMonths, excludedMonths } = useAppStore()
+  const months = getEffectiveMonths(selectedMonths, excludedMonths)
+  return useQuery({
+    queryKey: ['team-stats', months],
+    queryFn: () => api.getTeamStats(months),
+  })
+}
+
+export function useMonthlyTrendAllTeams() {
+  const { excludedMonths } = useAppStore()
+  return useQuery({
+    queryKey: ['monthly-trend-all-teams', excludedMonths],
+    queryFn: () => api.getMonthlyTrendAllTeams(),
+    select: (data) => {
+      if (!excludedMonths.length || !data?.months) return data
+      const indices = data.months.map((_: string, i: number) => i).filter((i: number) => !excludedMonths.includes(data.months[i]))
+      const result: any = { months: indices.map((i: number) => data.months[i]), teams: {} }
+      for (const [team, series] of Object.entries(data.teams) as any) {
+        result.teams[team] = {
+          total_savings: indices.map((i: number) => series.total_savings[i]),
+          savings_percent: indices.map((i: number) => series.savings_percent[i]),
+        }
+      }
+      return result
+    },
+  })
+}
+
 export function useUploadStatus() {
   return useQuery({ queryKey: ['upload-status'], queryFn: api.getUploadStatus })
 }

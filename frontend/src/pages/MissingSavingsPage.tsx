@@ -1,8 +1,8 @@
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { AlertTriangle, Mail, Eye, Send, CheckSquare, Square, ArrowUpCircle } from 'lucide-react'
+import { AlertTriangle, Mail, Eye, Send, CheckSquare, Square, ArrowUpCircle, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
-import { getMissingSavings, previewMissingSavingsMail, sendMissingSavingsMail, escalateToManager } from '@/services/api'
+import { getMissingSavings, previewMissingSavingsMail, sendMissingSavingsMail, escalateToManager, excludePatRecords } from '@/services/api'
 import { TeamTabs, EmptyState, Skeleton } from '@/components/ui'
 import { useMonths } from '@/hooks/useData'
 import { useState } from 'react'
@@ -35,8 +35,10 @@ export default function MissingSavingsPage() {
   const [patMonths, setPatMonths] = useState<string[]>([])
   const [savingsMonths, setSavingsMonths] = useState<string[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [previews, setPreviews] = useState<MailPreview[] | null>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const queryClient = useQueryClient()
 
   const patMonthsParam = patMonths.length ? patMonths.join(',') : undefined
   const savingsMonthsParam = savingsMonths.length ? savingsMonths.join(',') : undefined
@@ -57,6 +59,12 @@ export default function MissingSavingsPage() {
   const toggleSelectAll = () => {
     if (selected.size === records.length) setSelected(new Set())
     else setSelected(new Set(records.map((r: any) => r.signum)))
+  }
+
+  const toggleExpand = (signum: string) => {
+    const next = new Set(expanded)
+    next.has(signum) ? next.delete(signum) : next.add(signum)
+    setExpanded(next)
   }
 
   const previewMutation = useMutation({
@@ -82,6 +90,20 @@ export default function MissingSavingsPage() {
     },
     onError: () => alert('Escalation failed. Check authentication.'),
   })
+
+  const excludeMutation = useMutation({
+    mutationFn: (patIds: string[]) => excludePatRecords(patIds),
+    onSuccess: (res) => {
+      alert(`Removed ${res.removed} PAT records`)
+      queryClient.invalidateQueries({ queryKey: ['missing-savings'] })
+    },
+  })
+
+  const handleExcludePat = (patId: string) => {
+    if (confirm(`Exclude PAT ID ${patId} from dataset?`)) {
+      excludeMutation.mutate([patId])
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -117,84 +139,87 @@ export default function MissingSavingsPage() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => previewMutation.mutate()}
-                disabled={selected.size === 0 || previewMutation.isPending}
-                className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50"
-              >
+              <button onClick={() => previewMutation.mutate()} disabled={selected.size === 0 || previewMutation.isPending} className="btn-secondary flex items-center gap-2 text-sm disabled:opacity-50">
                 <Eye className="w-4 h-4" /> Preview
               </button>
-              <button
-                onClick={() => sendMutation.mutate()}
-                disabled={selected.size === 0 || sendMutation.isPending}
-                className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50"
-              >
+              <button onClick={() => sendMutation.mutate()} disabled={selected.size === 0 || sendMutation.isPending} className="btn-primary flex items-center gap-2 text-sm disabled:opacity-50">
                 <Send className="w-4 h-4" /> {sendMutation.isPending ? 'Sending...' : `Send (${selected.size})`}
               </button>
-              <button
-                onClick={() => escalateMutation.mutate()}
-                disabled={selected.size === 0 || escalateMutation.isPending}
-                className="btn-danger flex items-center gap-2 text-sm disabled:opacity-50"
-              >
+              <button onClick={() => escalateMutation.mutate()} disabled={selected.size === 0 || escalateMutation.isPending} className="btn-danger flex items-center gap-2 text-sm disabled:opacity-50">
                 <ArrowUpCircle className="w-4 h-4" /> {escalateMutation.isPending ? 'Escalating...' : 'Escalate'}
               </button>
             </div>
           </div>
 
-          {/* Records */}
-          {records.map((rec: any, idx: number) => (
-            <motion.div
-              key={rec.signum}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: idx * 0.05 }}
-              className="glass-card p-4 space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <button onClick={() => toggleSelect(rec.signum)} className="hover:text-blue-600">
-                    {selected.has(rec.signum) ? <CheckSquare className="w-5 h-5 text-blue-600" /> : <Square className="w-5 h-5" />}
-                  </button>
-                  <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+          {/* Collapsible Records */}
+          {records.map((rec: any, idx: number) => {
+            const isExpanded = expanded.has(rec.signum)
+            return (
+              <motion.div
+                key={rec.signum}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.03 }}
+                className="glass-card overflow-hidden"
+              >
+                <div className="p-4 flex items-center justify-between cursor-pointer" onClick={() => toggleExpand(rec.signum)}>
+                  <div className="flex items-center gap-3">
+                    <button onClick={(e) => { e.stopPropagation(); toggleSelect(rec.signum) }} className="hover:text-blue-600">
+                      {selected.has(rec.signum) ? <CheckSquare className="w-5 h-5 text-blue-600" /> : <Square className="w-5 h-5" />}
+                    </button>
+                    <div className="w-9 h-9 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">{rec.name}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">{rec.email} • {rec.department}</p>
+                      {rec.manager_email && <p className="text-xs text-[var(--text-secondary)]">Manager CC: {rec.manager_email}</p>}
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium">{rec.name}</p>
-                    <p className="text-xs text-[var(--text-secondary)]">{rec.email} • {rec.department}</p>
-                    {rec.manager_email && <p className="text-xs text-[var(--text-secondary)]">Manager CC: {rec.manager_email}</p>}
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{rec.pat_count} PATs</p>
+                      <p className="text-xs text-red-500">Savings: {rec.total_savings}</p>
+                    </div>
+                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium">{rec.pat_count} PATs</p>
-                  <p className="text-xs text-red-500">Savings: {rec.total_savings}</p>
-                </div>
-              </div>
-              {rec.pat_activities && rec.pat_activities.length > 0 && (
-                <table className="w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="text-left text-[var(--text-secondary)] bg-slate-50 dark:bg-slate-800">
-                      <th className="p-2 border border-[var(--border)]">PAT ID</th>
-                      <th className="p-2 border border-[var(--border)]">Activity Name</th>
-                      <th className="p-2 border border-[var(--border)]">Start Date & Time</th>
-                      <th className="p-2 border border-[var(--border)]">End Date & Time</th>
-                      <th className="p-2 border border-[var(--border)]">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rec.pat_activities.map((act: any, i: number) => (
-                      <tr key={i} className="border-t border-[var(--border)]">
-                        <td className="p-2 border border-[var(--border)]">{act.pat_id}</td>
-                        <td className="p-2 border border-[var(--border)]">{act.activity_name}</td>
-                        <td className="p-2 border border-[var(--border)]">{act.start_date}</td>
-                        <td className="p-2 border border-[var(--border)]">{act.end_date}</td>
-                        <td className="p-2 border border-[var(--border)]">{act.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </motion.div>
-          ))}
+
+                {isExpanded && rec.pat_activities && rec.pat_activities.length > 0 && (
+                  <div className="border-t border-[var(--border)] px-4 pb-4">
+                    <table className="w-full text-xs mt-3">
+                      <thead>
+                        <tr className="text-left text-[var(--text-secondary)]">
+                          <th className="pb-2">PAT ID</th>
+                          <th className="pb-2">Activity Name</th>
+                          <th className="pb-2">Start Date & Time</th>
+                          <th className="pb-2">End Date & Time</th>
+                          <th className="pb-2">Status</th>
+                          <th className="pb-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rec.pat_activities.map((act: any, i: number) => (
+                          <tr key={i} className="border-t border-[var(--border)]">
+                            <td className="py-2">{act.pat_id}</td>
+                            <td className="py-2">{act.activity_name}</td>
+                            <td className="py-2">{act.start_date}</td>
+                            <td className="py-2">{act.end_date}</td>
+                            <td className="py-2">{act.status}</td>
+                            <td className="py-2">
+                              <button onClick={() => handleExcludePat(act.pat_id)} className="text-red-500 hover:text-red-700" title="Exclude this record">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </motion.div>
+            )
+          })}
 
           {/* Preview Modal */}
           {showPreview && previews && (

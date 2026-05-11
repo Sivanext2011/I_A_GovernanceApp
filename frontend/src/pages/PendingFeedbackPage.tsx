@@ -1,8 +1,8 @@
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Clock, Mail, Eye, Send, CheckSquare, Square, ChevronDown, ChevronRight, ArrowUpCircle } from 'lucide-react'
+import { Clock, Mail, Eye, Send, CheckSquare, Square, ChevronDown, ChevronRight, ArrowUpCircle, Trash2 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
-import { getPendingFeedback, previewPendingFeedbackMail, sendPendingFeedbackMail, escalateToManager } from '@/services/api'
+import { getPendingFeedback, previewPendingFeedbackMail, sendPendingFeedbackMail, escalateToManager, excludeDownloadRecords } from '@/services/api'
 import { TeamTabs, EmptyState, Skeleton } from '@/components/ui'
 import { useState, useMemo } from 'react'
 
@@ -34,6 +34,7 @@ export default function PendingFeedbackPage() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [previews, setPreviews] = useState<MailPreview[] | null>(null)
   const [showPreview, setShowPreview] = useState(false)
+  const queryClient = useQueryClient()
 
   const { data, isLoading } = useQuery({
     queryKey: ['pending-feedback', selectedTeam],
@@ -99,6 +100,20 @@ export default function PendingFeedbackPage() {
     },
     onError: () => alert('Escalation failed. Check authentication.'),
   })
+
+  const excludeMutation = useMutation({
+    mutationFn: (feedbackIds: string[]) => excludeDownloadRecords(feedbackIds),
+    onSuccess: (res) => {
+      alert(`Removed ${res.removed} records`)
+      queryClient.invalidateQueries({ queryKey: ['pending-feedback'] })
+    },
+  })
+
+  const handleExcludeDownload = (feedbackId: string) => {
+    if (confirm(`Exclude Feedback ID ${feedbackId} from dataset?`)) {
+      excludeMutation.mutate([feedbackId])
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -200,6 +215,7 @@ export default function PendingFeedbackPage() {
                           <th className="pb-2">Download Date</th>
                           <th className="pb-2">Due Date</th>
                           <th className="pb-2">Overdue</th>
+                          <th className="pb-2"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -211,6 +227,11 @@ export default function PendingFeedbackPage() {
                             <td className="py-2">{item.download_date}</td>
                             <td className="py-2">{item.due_date}</td>
                             <td className="py-2 text-rose-500 font-medium">{item.overdue_duration}</td>
+                            <td className="py-2">
+                              <button onClick={() => handleExcludeDownload(item.feedback_id)} className="text-red-500 hover:text-red-700" title="Exclude this record">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>

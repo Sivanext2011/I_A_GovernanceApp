@@ -85,3 +85,27 @@ async def upload_status():
         "savings_rows": len(data_store.savings) if data_store.savings is not None else 0,
         "download_rows": len(data_store.download) if data_store.download is not None else 0,
     }
+
+
+@router.post("/exclude/pat")
+async def exclude_pat_records(pat_ids: list[str]):
+    """Remove specific PAT records by PAT ID."""
+    if data_store.pat is None:
+        raise HTTPException(400, "PAT data not loaded")
+    before = len(data_store.pat)
+    data_store.pat = data_store.pat[~data_store.pat["PAT ID"].astype(str).isin(pat_ids)]
+    removed = before - len(data_store.pat)
+    logger.info(f"Excluded {removed} PAT records")
+    return {"removed": removed, "remaining": len(data_store.pat)}
+
+
+@router.post("/exclude/download")
+async def exclude_download_records(feedback_ids: list[str]):
+    """Remove specific Download/Savings records by Feedback Id."""
+    if data_store.download is None:
+        raise HTTPException(400, "Download data not loaded")
+    before = len(data_store.download)
+    data_store.download = data_store.download[~data_store.download["Feedback Id"].astype(str).isin(feedback_ids)]
+    removed = before - len(data_store.download)
+    logger.info(f"Excluded {removed} Download records")
+    return {"removed": removed, "remaining": len(data_store.download)}

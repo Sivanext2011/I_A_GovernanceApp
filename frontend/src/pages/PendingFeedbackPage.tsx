@@ -196,6 +196,7 @@ export default function PendingFeedbackPage() {
                     <div>
                       <p className="font-medium text-sm">{first.name} <span className="text-xs text-[var(--text-secondary)]">({signum})</span></p>
                       <p className="text-xs text-[var(--text-secondary)]">{first.email} • {first.department}</p>
+                      {first.manager_email && <p className="text-xs text-[var(--text-secondary)]">Manager CC: {first.manager_email}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

@@ -17,6 +17,7 @@ interface FeedbackRecord {
   download_date: string
   due_date: string
   overdue_duration: number
+  manager_email: string
 }
 
 interface MailPreview {

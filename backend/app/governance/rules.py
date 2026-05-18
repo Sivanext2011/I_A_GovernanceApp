@@ -89,6 +89,7 @@ def get_pending_feedback(team: str = "Overall") -> list[dict]:
     for _, row in overdue.iterrows():
         signum = str(row.get("Signum", ""))
         name, email, dept = _enrich_practitioner(signum)
+        manager_email = _get_manager_email_by_signum(signum)
         results.append({
             "feedback_id": str(row.get("Feedback Id", "")),
             "asset_registry_id": str(row.get("Asset Registry Id", "")),
@@ -100,6 +101,7 @@ def get_pending_feedback(team: str = "Overall") -> list[dict]:
             "download_date": str(row.get("Download Date", "")),
             "due_date": str(row.get("Due Date", "")),
             "overdue_duration": int(row["Overdue Duration"]),
+            "manager_email": manager_email,
         })
     return results
 
@@ -139,6 +141,25 @@ def _get_manager_email(practitioner_email: str) -> str:
         return ""
     match = data_store.mapping[
         data_store.mapping["Ericsson Email Address"].str.strip().str.lower() == str(practitioner_email).strip().lower()
+    ]
+    if match.empty:
+        return ""
+    supervisor_no = str(match.iloc[0].get("Supervisor Personal No.", "")).strip()
+    if not supervisor_no:
+        return ""
+    mgr_match = data_store.mapping[
+        data_store.mapping["Pers.no."].astype(str).str.strip() == supervisor_no
+    ]
+    if mgr_match.empty:
+        return ""
+    return str(mgr_match.iloc[0].get("Ericsson Email Address", ""))
+
+
+def _get_manager_email_by_signum(signum: str) -> str:
+    if data_store.mapping is None or data_store.mapping.empty:
+        return ""
+    match = data_store.mapping[
+        data_store.mapping["Corporate ID"].str.strip().str.lower() == str(signum).strip().lower()
     ]
     if match.empty:
         return ""

@@ -329,9 +329,10 @@ class App:
             self.records = grouped
             for signum, items in grouped.items():
                 first = items[0]
+                manager_email = first.get("manager_email", "")
                 self.tree.insert("", tk.END, iid=signum, values=(
                     "☐", first["name"], first["email"], first["department"],
-                    len(items), ""
+                    len(items), manager_email
                 ))
         self.status_var.set(f"Loaded {len(self.tree.get_children())} records")
 
@@ -508,7 +509,7 @@ class App:
             if not items or not items[0]["email"]:
                 return None, None, None, None
             to = [items[0]["email"]]
-            cc = []
+            cc = [items[0].get("manager_email", "")] if items[0].get("manager_email") else []
             subject = "Action Required - Pending Feedback"
             body = build_pending_feedback_html(items[0]["name"], items)
             return to, cc, subject, body

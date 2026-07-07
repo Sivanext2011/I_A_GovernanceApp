@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     EXPORT_DIR: Path = BASE_DIR / "exports"
     PHOTO_DIR: Path = BASE_DIR / "photos"
     LOG_DIR: Path = BASE_DIR / "logs"
+    DOCS_DIR: Path = BASE_DIR.parent / "docs"
     
     # Azure AD / Graph API
     AZURE_CLIENT_ID: str = ""

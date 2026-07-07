@@ -1,10 +1,16 @@
+# -*- coding: utf-8 -*-
 """
 Desktop Client - Missing Savings & Pending Feedback Mail Sender
 Connects to backend API and sends mails via local Outlook (win32com).
+Modern UI with ttkbootstrap theming.
 """
 
+import ttkbootstrap as ttk
+from ttkbootstrap.constants import *
+from ttkbootstrap.dialogs import Messagebox
+from ttkbootstrap.tooltip import ToolTip
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import filedialog
 import requests
 import threading
 import win32com.client
@@ -83,6 +89,19 @@ class APIClient:
         r.raise_for_status()
         return r.json()
 
+    def download_doc(self, doc_type: str, save_path: str, period: str = "monthly"):
+        """Download a document from the backend."""
+        if doc_type == "monthly-savings":
+            url = f"{self.base}/exports/docs/monthly-savings-report"
+            r = requests.get(url, timeout=60, stream=True)
+        else:
+            url = f"{self.base}/exports/docs/asset-presentation"
+            r = requests.get(url, params={"period": period}, timeout=60, stream=True)
+        r.raise_for_status()
+        with open(save_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+
 
 def build_missing_savings_html(name: str, activities: list[dict]) -> str:
     rows = ""
@@ -129,135 +148,294 @@ def build_escalation_html(mgr_name: str, members: list[dict], escalation_type: s
 <p>Regards,<br/>{SENDER_NAME}</p>"""
 
 
+
 class App:
     def __init__(self, root):
         self.root = root
         self.root.title("Governance Mail Client")
-        self.root.geometry("1200x750")
+        self.root.geometry("1280x800")
+        self.root.minsize(1000, 600)
         self.api = APIClient(API_BASE)
         self.records = []
         self.selected = set()
 
+        # Apply custom styles
+        self.style = ttk.Style()
+        self._configure_styles()
         self._build_ui()
         self._load_teams()
 
+    def _configure_styles(self):
+        """Configure custom widget styles for a polished look."""
+        self.style.configure("Header.TLabel", font=("Segoe UI", 16, "bold"))
+        self.style.configure("Subheader.TLabel", font=("Segoe UI", 11))
+        self.style.configure("Card.TFrame", relief="flat")
+        self.style.configure(
+            "Treeview",
+            font=("Segoe UI", 10),
+            rowheight=30,
+        )
+        self.style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"))
+
     def _build_ui(self):
+        # Header bar
+        header = ttk.Frame(self.root, bootstyle="primary")
+        header.pack(fill=X, side=TOP)
+        ttk.Label(
+            header, text="  📧  Governance Mail Client",
+            font=("Segoe UI", 14, "bold"),
+            bootstyle="inverse-primary",
+        ).pack(side=LEFT, padx=10, pady=8)
+        ttk.Label(
+            header, text="Automation Savings & Pending Feedback  ",
+            font=("Segoe UI", 9),
+            bootstyle="inverse-primary",
+        ).pack(side=RIGHT, padx=10, pady=8)
+
         # Notebook for tabs
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        self.notebook = ttk.Notebook(self.root, bootstyle="primary")
+        self.notebook.pack(fill=BOTH, expand=True, padx=10, pady=(10, 5))
 
         # Tab 1: Mail
-        mail_frame = ttk.Frame(self.notebook)
-        self.notebook.add(mail_frame, text="  Mail  ")
+        mail_frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(mail_frame, text="  📬  Mail  ")
         self._build_mail_tab(mail_frame)
 
         # Tab 2: Upload
-        upload_frame = ttk.Frame(self.notebook)
-        self.notebook.add(upload_frame, text="  Upload Data  ")
+        upload_frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(upload_frame, text="  📁  Upload Data  ")
         self._build_upload_tab(upload_frame)
 
+        # Tab 3: Downloads
+        download_frame = ttk.Frame(self.notebook, padding=10)
+        self.notebook.add(download_frame, text="  ⬇  Downloads  ")
+        self._build_download_tab(download_frame)
+
         # Status bar
+        status_frame = ttk.Frame(self.root, bootstyle="secondary")
+        status_frame.pack(fill=X, side=BOTTOM)
         self.status_var = tk.StringVar(value="Ready")
-        ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, padding=5).pack(fill=tk.X, side=tk.BOTTOM)
+        ttk.Label(
+            status_frame, textvariable=self.status_var,
+            font=("Segoe UI", 9), bootstyle="inverse-secondary",
+        ).pack(side=LEFT, padx=10, pady=4)
 
     def _build_mail_tab(self, parent):
-        # Top frame - controls
-        top = ttk.Frame(parent, padding=10)
-        top.pack(fill=tk.X)
+        # Top controls in a card-like frame
+        controls = ttk.Labelframe(parent, text="Controls", bootstyle="info", padding=12)
+        controls.pack(fill=X, pady=(0, 8))
 
-        ttk.Label(top, text="Team:").pack(side=tk.LEFT)
+        row1 = ttk.Frame(controls)
+        row1.pack(fill=X, pady=(0, 8))
+
+        ttk.Label(row1, text="Team:", font=("Segoe UI", 10)).pack(side=LEFT)
         self.team_var = tk.StringVar(value="Overall")
-        self.team_combo = ttk.Combobox(top, textvariable=self.team_var, width=20, state="readonly")
-        self.team_combo.pack(side=tk.LEFT, padx=5)
+        self.team_combo = ttk.Combobox(
+            row1, textvariable=self.team_var, width=22,
+            state="readonly", bootstyle="info"
+        )
+        self.team_combo.pack(side=LEFT, padx=(5, 20))
 
-        ttk.Label(top, text="View:").pack(side=tk.LEFT, padx=(20, 0))
+        ttk.Label(row1, text="View:", font=("Segoe UI", 10)).pack(side=LEFT)
         self.view_var = tk.StringVar(value="Missing Savings")
-        self.view_combo = ttk.Combobox(top, textvariable=self.view_var, values=["Missing Savings", "Pending Feedback"], width=20, state="readonly")
-        self.view_combo.pack(side=tk.LEFT, padx=5)
+        self.view_combo = ttk.Combobox(
+            row1, textvariable=self.view_var,
+            values=["Missing Savings", "Pending Feedback"],
+            width=22, state="readonly", bootstyle="info"
+        )
+        self.view_combo.pack(side=LEFT, padx=5)
 
-        ttk.Button(top, text="Fetch Data", command=self._fetch_data).pack(side=tk.LEFT, padx=10)
+        fetch_btn = ttk.Button(
+            row1, text="🔄  Fetch Data", command=self._fetch_data,
+            bootstyle="success", width=14
+        )
+        fetch_btn.pack(side=LEFT, padx=(20, 0))
+        ToolTip(fetch_btn, text="Fetch governance data from backend")
 
-        # Month filters frame
-        month_frame = ttk.LabelFrame(parent, text="Month Filters (Missing Savings only)", padding=8)
-        month_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+        # Month filters
+        month_frame = ttk.Labelframe(parent, text="Month Filters (Missing Savings only)", bootstyle="secondary", padding=10)
+        month_frame.pack(fill=X, pady=(0, 8))
 
-        pat_row = ttk.Frame(month_frame)
-        pat_row.pack(fill=tk.X, pady=2)
-        ttk.Label(pat_row, text="PAT Months (activity):", width=25, anchor=tk.W).pack(side=tk.LEFT)
-        self.pat_months_listbox = tk.Listbox(pat_row, selectmode=tk.MULTIPLE, height=3, exportselection=False)
-        self.pat_months_listbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        filters_row = ttk.Frame(month_frame)
+        filters_row.pack(fill=X)
+        filters_row.columnconfigure(1, weight=1)
+        filters_row.columnconfigure(3, weight=1)
 
-        sav_row = ttk.Frame(month_frame)
-        sav_row.pack(fill=tk.X, pady=2)
-        ttk.Label(sav_row, text="Savings Months (recorded):", width=25, anchor=tk.W).pack(side=tk.LEFT)
-        self.savings_months_listbox = tk.Listbox(sav_row, selectmode=tk.MULTIPLE, height=3, exportselection=False)
-        self.savings_months_listbox.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Label(filters_row, text="PAT Months:", font=("Segoe UI", 9)).grid(row=0, column=0, sticky=W, padx=(0, 5))
+        self.pat_months_listbox = tk.Listbox(
+            filters_row, selectmode=tk.MULTIPLE, height=3,
+            exportselection=False, font=("Segoe UI", 9),
+            relief="flat", highlightthickness=1
+        )
+        self.pat_months_listbox.grid(row=0, column=1, sticky=EW, padx=(0, 20))
 
-        ttk.Button(month_frame, text="Clear Month Filters", command=self._clear_month_filters).pack(anchor=tk.W, pady=(5, 0))
+        ttk.Label(filters_row, text="Savings Months:", font=("Segoe UI", 9)).grid(row=0, column=2, sticky=W, padx=(0, 5))
+        self.savings_months_listbox = tk.Listbox(
+            filters_row, selectmode=tk.MULTIPLE, height=3,
+            exportselection=False, font=("Segoe UI", 9),
+            relief="flat", highlightthickness=1
+        )
+        self.savings_months_listbox.grid(row=0, column=3, sticky=EW)
 
-        # Action buttons row
-        btn_frame = ttk.Frame(parent, padding=(10, 0, 10, 5))
-        btn_frame.pack(fill=tk.X)
-        ttk.Button(btn_frame, text="Select All", command=self._select_all).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="Deselect All", command=self._deselect_all).pack(side=tk.LEFT, padx=2)
-        ttk.Separator(btn_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, padx=8, fill=tk.Y)
-        ttk.Button(btn_frame, text="Preview", command=self._preview_selected).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="Send Selected", command=self._send_selected).pack(side=tk.LEFT, padx=2)
-        ttk.Button(btn_frame, text="Send All", command=self._send_all).pack(side=tk.LEFT, padx=2)
-        ttk.Separator(btn_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, padx=8, fill=tk.Y)
-        ttk.Button(btn_frame, text="⚠ Escalate Selected", command=self._escalate_selected).pack(side=tk.LEFT, padx=2)
+        ttk.Button(
+            month_frame, text="Clear Filters", command=self._clear_month_filters,
+            bootstyle="secondary-outline", width=14
+        ).pack(anchor=W, pady=(8, 0))
 
-        # Table
+        # Action buttons
+        btn_frame = ttk.Frame(parent)
+        btn_frame.pack(fill=X, pady=(0, 8))
+
+        ttk.Button(btn_frame, text="☑ Select All", command=self._select_all, bootstyle="outline", width=12).pack(side=LEFT, padx=2)
+        ttk.Button(btn_frame, text="☐ Deselect", command=self._deselect_all, bootstyle="outline", width=12).pack(side=LEFT, padx=2)
+        ttk.Separator(btn_frame, orient=VERTICAL, bootstyle="secondary").pack(side=LEFT, padx=10, fill=Y, pady=2)
+        ttk.Button(btn_frame, text="👁 Preview", command=self._preview_selected, bootstyle="info", width=10).pack(side=LEFT, padx=2)
+        ttk.Button(btn_frame, text="📤 Send Selected", command=self._send_selected, bootstyle="success", width=14).pack(side=LEFT, padx=2)
+        ttk.Button(btn_frame, text="📤 Send All", command=self._send_all, bootstyle="success-outline", width=10).pack(side=LEFT, padx=2)
+        ttk.Separator(btn_frame, orient=VERTICAL, bootstyle="secondary").pack(side=LEFT, padx=10, fill=Y, pady=2)
+        ttk.Button(btn_frame, text="⚠ Escalate", command=self._escalate_selected, bootstyle="danger", width=12).pack(side=LEFT, padx=2)
+
+        # Treeview table
+        tree_frame = ttk.Frame(parent)
+        tree_frame.pack(fill=BOTH, expand=True)
+
         cols = ("select", "name", "email", "department", "count", "manager")
-        self.tree = ttk.Treeview(parent, columns=cols, show="headings", selectmode="extended")
+        self.tree = ttk.Treeview(
+            tree_frame, columns=cols, show="headings",
+            selectmode="extended", bootstyle="primary"
+        )
         self.tree.heading("select", text="✓")
         self.tree.heading("name", text="Name")
         self.tree.heading("email", text="Email")
         self.tree.heading("department", text="Department")
         self.tree.heading("count", text="Items")
         self.tree.heading("manager", text="Manager CC")
-        self.tree.column("select", width=30, anchor=tk.CENTER)
-        self.tree.column("name", width=200)
-        self.tree.column("email", width=250)
-        self.tree.column("department", width=150)
-        self.tree.column("count", width=60, anchor=tk.CENTER)
-        self.tree.column("manager", width=250)
+        self.tree.column("select", width=35, anchor=CENTER)
+        self.tree.column("name", width=180)
+        self.tree.column("email", width=240)
+        self.tree.column("department", width=140)
+        self.tree.column("count", width=60, anchor=CENTER)
+        self.tree.column("manager", width=240)
 
-        scrollbar = ttk.Scrollbar(parent, orient=tk.VERTICAL, command=self.tree.yview)
+        scrollbar = ttk.Scrollbar(tree_frame, orient=VERTICAL, command=self.tree.yview, bootstyle="primary-round")
         self.tree.configure(yscrollcommand=scrollbar.set)
-        self.tree.pack(fill=tk.BOTH, expand=True, padx=10, pady=5, side=tk.LEFT)
-        scrollbar.pack(fill=tk.Y, side=tk.RIGHT, pady=5)
+        self.tree.pack(fill=BOTH, expand=True, side=LEFT)
+        scrollbar.pack(fill=Y, side=RIGHT)
         self.tree.bind("<ButtonRelease-1>", self._on_tree_click)
 
-    def _build_upload_tab(self, parent):
-        frame = ttk.Frame(parent, padding=20)
-        frame.pack(fill=tk.BOTH, expand=True)
 
-        ttk.Label(frame, text="Upload Datasets to Backend", font=("", 14, "bold")).pack(pady=(0, 20))
+    def _build_upload_tab(self, parent):
+        # Header
+        ttk.Label(
+            parent, text="Upload Datasets to Backend",
+            style="Header.TLabel"
+        ).pack(pady=(10, 5))
+        ttk.Label(
+            parent, text="Select and upload Excel files to the backend for processing",
+            style="Subheader.TLabel", foreground="gray"
+        ).pack(pady=(0, 20))
 
         files = [
-            ("PAT File", "pat", "PAT Details sheet"),
-            ("Mapping File", "mapping", "Export sheet"),
-            ("Savings File", "savings", "Savings - Line Manager sheet"),
-            ("Download File", "download", "Pending feedback data"),
+            ("PAT File", "pat", "PAT Details sheet", "info"),
+            ("Mapping File", "mapping", "Export sheet", "primary"),
+            ("Savings File", "savings", "Savings - Line Manager sheet", "success"),
+            ("Download File", "download", "Pending feedback data", "warning"),
         ]
 
         self.upload_labels = {}
-        for label, file_type, desc in files:
-            row = ttk.Frame(frame)
-            row.pack(fill=tk.X, pady=8)
-            ttk.Label(row, text=f"{label}:", width=15, anchor=tk.W).pack(side=tk.LEFT)
-            ttk.Label(row, text=f"({desc})", foreground="gray").pack(side=tk.LEFT, padx=(0, 10))
-            ttk.Button(row, text="Browse & Upload", command=lambda ft=file_type, lb=label: self._upload_file(ft, lb)).pack(side=tk.LEFT, padx=5)
-            status_lbl = ttk.Label(row, text="", foreground="green")
-            status_lbl.pack(side=tk.LEFT, padx=10)
+        for label, file_type, desc, color in files:
+            card = ttk.Frame(parent, padding=12)
+            card.pack(fill=X, pady=4)
+
+            ttk.Label(card, text=f"📄  {label}", font=("Segoe UI", 10, "bold")).pack(side=LEFT)
+            ttk.Label(card, text=f"  ({desc})", font=("Segoe UI", 9), foreground="gray").pack(side=LEFT, padx=(0, 15))
+
+            status_lbl = ttk.Label(card, text="", font=("Segoe UI", 9))
+            status_lbl.pack(side=RIGHT, padx=10)
             self.upload_labels[file_type] = status_lbl
 
-        ttk.Separator(frame).pack(fill=tk.X, pady=20)
-        ttk.Button(frame, text="Check Upload Status", command=self._check_upload_status).pack()
+            ttk.Button(
+                card, text="Browse & Upload",
+                command=lambda ft=file_type, lb=label: self._upload_file(ft, lb),
+                bootstyle=color, width=16
+            ).pack(side=RIGHT, padx=5)
 
-        self.upload_status_text = tk.Text(frame, height=6, width=60, state=tk.DISABLED)
-        self.upload_status_text.pack(pady=10)
+        ttk.Separator(parent, bootstyle="secondary").pack(fill=X, pady=20)
+
+        status_section = ttk.Labelframe(parent, text="Backend Status", bootstyle="info", padding=12)
+        status_section.pack(fill=X)
+
+        ttk.Button(
+            status_section, text="🔍  Check Upload Status",
+            command=self._check_upload_status, bootstyle="info-outline"
+        ).pack(anchor=W, pady=(0, 10))
+
+        self.upload_status_text = tk.Text(
+            status_section, height=5, width=60,
+            state=tk.DISABLED, font=("Consolas", 10),
+            relief="flat", padx=10, pady=8
+        )
+        self.upload_status_text.pack(fill=X)
+
+    def _build_download_tab(self, parent):
+        """Tab for downloading reports from backend."""
+        ttk.Label(
+            parent, text="Download Reports",
+            style="Header.TLabel"
+        ).pack(pady=(10, 5))
+        ttk.Label(
+            parent, text="Download the latest reports from the backend server",
+            style="Subheader.TLabel", foreground="gray"
+        ).pack(pady=(0, 30))
+
+        # --- Excel Report ---
+        excel_card = ttk.Labelframe(parent, text="  Monthly Savings Report  ", bootstyle="success", padding=16)
+        excel_card.pack(fill=X, pady=8)
+
+        info_row = ttk.Frame(excel_card)
+        info_row.pack(fill=X, pady=(0, 10))
+        ttk.Label(info_row, text="📊  Monthly_Savings_Report.xlsx", font=("Segoe UI", 10, "bold")).pack(side=LEFT)
+        ttk.Label(info_row, text="Consolidated monthly savings data across all teams", font=("Segoe UI", 9), foreground="gray").pack(side=LEFT, padx=(15, 0))
+
+        excel_btn_row = ttk.Frame(excel_card)
+        excel_btn_row.pack(fill=X)
+        self.excel_dl_label = ttk.Label(excel_btn_row, text="", font=("Segoe UI", 9))
+        self.excel_dl_label.pack(side=RIGHT, padx=10)
+        ttk.Button(
+            excel_btn_row, text="⬇  Download Excel Report",
+            command=self._download_excel_report,
+            bootstyle="success", width=28
+        ).pack(side=LEFT)
+
+        # --- PPT Report with period selection ---
+        ppt_card = ttk.Labelframe(parent, text="  Asset Presentation  ", bootstyle="warning", padding=16)
+        ppt_card.pack(fill=X, pady=8)
+
+        info_row2 = ttk.Frame(ppt_card)
+        info_row2.pack(fill=X, pady=(0, 10))
+        ttk.Label(info_row2, text="📑  Asset Presentation (PowerPoint)", font=("Segoe UI", 10, "bold")).pack(side=LEFT)
+        ttk.Label(info_row2, text="Asset analytics presentation", font=("Segoe UI", 9), foreground="gray").pack(side=LEFT, padx=(15, 0))
+
+        period_row = ttk.Frame(ppt_card)
+        period_row.pack(fill=X, pady=(0, 10))
+        ttk.Label(period_row, text="Period:", font=("Segoe UI", 10)).pack(side=LEFT, padx=(0, 8))
+        self.ppt_period_var = tk.StringVar(value="monthly")
+        period_combo = ttk.Combobox(
+            period_row, textvariable=self.ppt_period_var,
+            values=["monthly", "quarterly", "half-yearly", "year-end"],
+            state="readonly", width=18, bootstyle="warning"
+        )
+        period_combo.pack(side=LEFT)
+
+        ppt_btn_row = ttk.Frame(ppt_card)
+        ppt_btn_row.pack(fill=X)
+        self.ppt_dl_label = ttk.Label(ppt_btn_row, text="", font=("Segoe UI", 9))
+        self.ppt_dl_label.pack(side=RIGHT, padx=10)
+        ttk.Button(
+            ppt_btn_row, text="⬇  Download Presentation",
+            command=self._download_ppt_report,
+            bootstyle="warning", width=28
+        ).pack(side=LEFT)
 
     def _load_teams(self):
         try:
@@ -287,6 +465,7 @@ class App:
 
     def _get_selected_savings_months(self) -> list[str]:
         return [self.savings_months_listbox.get(i) for i in self.savings_months_listbox.curselection()]
+
 
     def _fetch_data(self):
         self.status_var.set("Fetching data...")
@@ -320,7 +499,6 @@ class App:
                     rec["pat_count"], rec.get("manager_email", "")
                 ))
         else:
-            # Group by signum
             grouped = {}
             for rec in records:
                 if rec["signum"] not in grouped:
@@ -368,9 +546,10 @@ class App:
             self.tree.item(item, values=vals)
         self.status_var.set("0 selected")
 
+
     def _preview_selected(self):
         if not self.selected:
-            messagebox.showwarning("No Selection", "Select at least one record.")
+            Messagebox.show_warning("Select at least one record.", "No Selection")
             return
         view = self.view_var.get()
         item_id = list(self.selected)[0]
@@ -379,13 +558,14 @@ class App:
             try:
                 OutlookMailer.preview(to, cc, subject, body)
             except Exception as e:
-                messagebox.showerror("Outlook Error", str(e))
+                Messagebox.show_error(str(e), "Outlook Error")
 
     def _send_selected(self):
         if not self.selected:
-            messagebox.showwarning("No Selection", "Select at least one record.")
+            Messagebox.show_warning("Select at least one record.", "No Selection")
             return
-        if not messagebox.askyesno("Confirm", f"Send mail to {len(self.selected)} recipient(s)?"):
+        result = Messagebox.yesno(f"Send mail to {len(self.selected)} recipient(s)?", "Confirm Send")
+        if result != "Yes":
             return
         self._send_mails(list(self.selected))
 
@@ -393,22 +573,23 @@ class App:
         all_items = list(self.tree.get_children())
         if not all_items:
             return
-        if not messagebox.askyesno("Confirm", f"Send mail to ALL {len(all_items)} recipient(s)?"):
+        result = Messagebox.yesno(f"Send mail to ALL {len(all_items)} recipient(s)?", "Confirm Send All")
+        if result != "Yes":
             return
         self._send_mails(all_items)
 
     def _escalate_selected(self):
         """Escalate: send mail to manager with list of their defaulting team members."""
         if not self.selected:
-            messagebox.showwarning("No Selection", "Select at least one record to escalate.")
+            Messagebox.show_warning("Select at least one record to escalate.", "No Selection")
             return
-        if not messagebox.askyesno("Confirm Escalation", f"Escalate {len(self.selected)} record(s) to their manager(s)?"):
+        result = Messagebox.yesno(f"Escalate {len(self.selected)} record(s) to their manager(s)?", "Confirm Escalation")
+        if result != "Yes":
             return
 
         view = self.view_var.get()
         escalation_type = "missing_savings" if view == "Missing Savings" else "pending_feedback"
 
-        # Group selected by manager
         manager_groups: dict[str, dict] = {}
 
         for item_id in self.selected:
@@ -429,12 +610,9 @@ class App:
                 items = self.records.get(item_id, [])
                 if not items:
                     continue
-                # Get manager from tree values
                 vals = self.tree.item(item_id, "values")
                 mgr_email = vals[5] if len(vals) > 5 and vals[5] else ""
-                # If no manager in table, try API
                 if not mgr_email:
-                    # Skip if no manager info available
                     continue
                 if mgr_email not in manager_groups:
                     manager_groups[mgr_email] = {"mgr_name": "", "members": []}
@@ -444,7 +622,7 @@ class App:
                 })
 
         if not manager_groups:
-            messagebox.showwarning("No Managers", "Could not find manager emails for selected records.")
+            Messagebox.show_warning("Could not find manager emails for selected records.", "No Managers")
             return
 
         def do_escalate():
@@ -466,7 +644,7 @@ class App:
 
     def _escalate_complete(self, sent, failed):
         self.status_var.set(f"Escalation done. Sent: {sent}, Failed: {failed}")
-        messagebox.showinfo("Escalation Complete", f"Sent to {sent} manager(s)\nFailed: {failed}")
+        Messagebox.show_info(f"Sent to {sent} manager(s)\nFailed: {failed}", "Escalation Complete")
 
     def _send_mails(self, item_ids):
         view = self.view_var.get()
@@ -492,7 +670,7 @@ class App:
 
     def _send_complete(self, sent, failed):
         self.status_var.set(f"Done. Sent: {sent}, Failed: {failed}")
-        messagebox.showinfo("Complete", f"Sent: {sent}\nFailed: {failed}")
+        Messagebox.show_info(f"Sent: {sent}\nFailed: {failed}", "Complete")
 
     def _build_mail(self, item_id, view):
         if view == "Missing Savings":
@@ -513,6 +691,7 @@ class App:
             subject = "Action Required - Pending Feedback"
             body = build_pending_feedback_html(items[0]["name"], items)
             return to, cc, subject, body
+
 
     def _upload_file(self, file_type, label):
         filepath = filedialog.askopenfilename(
@@ -540,7 +719,7 @@ class App:
     def _upload_error(self, file_type, error):
         self.upload_labels[file_type].config(text=f"✗ Failed", foreground="red")
         self.status_var.set("Upload failed")
-        messagebox.showerror("Upload Error", error)
+        Messagebox.show_error(error, "Upload Error")
 
     def _check_upload_status(self):
         def fetch():
@@ -556,20 +735,89 @@ class App:
         self.upload_status_text.config(state=tk.NORMAL)
         self.upload_status_text.delete("1.0", tk.END)
         lines = [
-            f"PAT:      {'✓ Loaded' if status['pat'] else '✗ Not loaded'} ({status['pat_rows']} rows)",
-            f"Mapping:  {'✓ Loaded' if status['mapping'] else '✗ Not loaded'} ({status['mapping_rows']} rows)",
-            f"Savings:  {'✓ Loaded' if status['savings'] else '✗ Not loaded'} ({status['savings_rows']} rows)",
-            f"Download: {'✓ Loaded' if status['download'] else '✗ Not loaded'} ({status['download_rows']} rows)",
+            f"  PAT:      {'✓ Loaded' if status['pat'] else '✗ Not loaded'}  ({status['pat_rows']} rows)",
+            f"  Mapping:  {'✓ Loaded' if status['mapping'] else '✗ Not loaded'}  ({status['mapping_rows']} rows)",
+            f"  Savings:  {'✓ Loaded' if status['savings'] else '✗ Not loaded'}  ({status['savings_rows']} rows)",
+            f"  Download: {'✓ Loaded' if status['download'] else '✗ Not loaded'}  ({status['download_rows']} rows)",
         ]
         self.upload_status_text.insert(tk.END, "\n".join(lines))
         self.upload_status_text.config(state=tk.DISABLED)
 
+    def _download_excel_report(self):
+        """Download Monthly Savings Report from backend."""
+        save_path = filedialog.asksaveasfilename(
+            title="Save Monthly Savings Report",
+            initialfile="Monthly_Savings_Report.xlsx",
+            defaultextension=".xlsx",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+        )
+        if not save_path:
+            return
+        self.status_var.set("Downloading Monthly Savings Report...")
+        self.excel_dl_label.config(text="⏳ Downloading...", foreground="orange")
+
+        def do_download():
+            try:
+                self.api.download_doc("monthly-savings", save_path)
+                self.root.after(0, lambda: self._excel_download_success(save_path))
+            except Exception as e:
+                self.root.after(0, lambda: self._excel_download_error(str(e)))
+
+        threading.Thread(target=do_download, daemon=True).start()
+
+    def _excel_download_success(self, save_path):
+        self.excel_dl_label.config(text="✓ Downloaded", foreground="green")
+        self.status_var.set(f"Downloaded to: {save_path}")
+
+    def _excel_download_error(self, error):
+        self.excel_dl_label.config(text="✗ Failed", foreground="red")
+        self.status_var.set("Download failed")
+        Messagebox.show_error(error, "Download Error")
+
+    def _download_ppt_report(self):
+        """Download Asset Presentation for selected period."""
+        period = self.ppt_period_var.get()
+        filename = f"Asset_{period.replace('-', '_').title()}.pptx"
+        save_path = filedialog.asksaveasfilename(
+            title=f"Save Asset Presentation ({period})",
+            initialfile=filename,
+            defaultextension=".pptx",
+            filetypes=[("PowerPoint files", "*.pptx"), ("All files", "*.*")]
+        )
+        if not save_path:
+            return
+        self.status_var.set(f"Downloading Asset Presentation ({period})...")
+        self.ppt_dl_label.config(text="⏳ Downloading...", foreground="orange")
+
+        def do_download():
+            try:
+                self.api.download_doc("asset-ppt", save_path, period)
+                self.root.after(0, lambda: self._ppt_download_success(save_path))
+            except Exception as e:
+                self.root.after(0, lambda: self._ppt_download_error(str(e)))
+
+        threading.Thread(target=do_download, daemon=True).start()
+
+    def _ppt_download_success(self, save_path):
+        self.ppt_dl_label.config(text="✓ Downloaded", foreground="green")
+        self.status_var.set(f"Downloaded to: {save_path}")
+
+    def _ppt_download_error(self, error):
+        self.ppt_dl_label.config(text="✗ Failed", foreground="red")
+        self.status_var.set("Download failed")
+        Messagebox.show_error(error, "Download Error")
+
     def _show_error(self, msg):
         self.status_var.set("Error")
-        messagebox.showerror("Error", msg)
+        Messagebox.show_error(msg, "Error")
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
+    app = ttk.Window(
+        title="Governance Mail Client",
+        themename="cosmo",
+        size=(1280, 800),
+        minsize=(1000, 600),
+    )
+    App(app)
+    app.mainloop()

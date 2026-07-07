@@ -60,6 +60,12 @@ export const exportPDF = (team: string, months?: string) =>
 export const exportPNG = (team: string, chartType: string, months?: string) =>
   api.get('/exports/png', { params: { team, chart_type: chartType, months }, responseType: 'blob' })
 
+export const exportMonthlySavingsReport = () =>
+  api.get('/exports/docs/monthly-savings-report', { responseType: 'blob' })
+
+export const exportAssetPresentation = (period: string = 'monthly') =>
+  api.get('/exports/docs/asset-presentation', { params: { period }, responseType: 'blob' })
+
 export const sendMail = (data: { recipients: string[]; subject: string; body: string }) =>
   api.post('/mail/send', data).then(r => r.data)
 

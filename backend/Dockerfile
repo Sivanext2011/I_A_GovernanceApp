@@ -7,7 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p uploads exports photos logs
+RUN mkdir -p uploads exports photos logs docs
 
 EXPOSE 8000
 

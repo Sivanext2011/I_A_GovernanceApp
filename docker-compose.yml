@@ -10,6 +10,7 @@ services:
       - app-exports:/app/exports
       - app-photos:/app/photos
       - app-logs:/app/logs
+      - ./docs:/app/docs
     environment:
       - AZURE_CLIENT_ID=${AZURE_CLIENT_ID:-}
       - AZURE_TENANT_ID=${AZURE_TENANT_ID:-}

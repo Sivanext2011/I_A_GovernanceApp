@@ -351,35 +351,25 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
         ])
     _add_table(slide, team_data, Inches(0.5), Inches(3.8), Inches(12), Inches(2.5))
 
-    # --- Slide 3: Monthly Savings Trend ---
-    slide = prs.slides.add_slide(slide_layout)
-    _add_text_box(slide, "Monthly Savings Trend", Inches(0.5), Inches(0.2),
-                  Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
-    chart_path = _generate_chart_png("savings_trend", months_2026)
-    slide.shapes.add_picture(str(chart_path), Inches(0.5), Inches(1), Inches(12), Inches(5.5))
-
-    # --- Slide 4: Savings % Trend ---
-    slide = prs.slides.add_slide(slide_layout)
-    _add_text_box(slide, "Savings % Trend", Inches(0.5), Inches(0.2),
-                  Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
-    chart_path = _generate_chart_png("savings_pct", months_2026)
-    slide.shapes.add_picture(str(chart_path), Inches(0.5), Inches(1), Inches(12), Inches(5.5))
-
-    # --- Slide 5: Department wise Savings ---
-    slide = prs.slides.add_slide(slide_layout)
-    _add_text_box(slide, "Department wise Savings", Inches(0.5), Inches(0.2),
-                  Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
-    chart_path = _generate_chart_png("dept_comparison", months_2026)
-    slide.shapes.add_picture(str(chart_path), Inches(0.5), Inches(1), Inches(12), Inches(5.5))
-
-    # --- Slide 6: Downloads vs Reuse ---
-    slide = prs.slides.add_slide(slide_layout)
-    _add_text_box(slide, "Downloads vs Reuse", Inches(0.5), Inches(0.2),
-                  Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
-    chart_path = _generate_chart_png("downloads_vs_reuse", months_2026)
-    slide.shapes.add_picture(str(chart_path), Inches(0.5), Inches(1), Inches(12), Inches(5.5))
+    # --- Slide 3-6: Charts ---
+    chart_slides = [
+        ("Monthly Savings Trend", "savings_trend"),
+        ("Savings % Trend", "savings_pct"),
+        ("Department wise Savings", "dept_comparison"),
+        ("Downloads vs Reuse", "downloads_vs_reuse"),
+    ]
+    for title, chart_type in chart_slides:
+        slide = prs.slides.add_slide(slide_layout)
+        _add_text_box(slide, title, Inches(0.5), Inches(0.2),
+                      Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
+        chart_path = _generate_chart_png(chart_type, months_2026)
+        with open(str(chart_path), "rb") as f:
+            img_stream = BytesIO(f.read())
+        slide.shapes.add_picture(img_stream, Inches(0.5), Inches(1), Inches(12), Inches(5.5))
 
     # --- Slides 7+: Top Asset Reusers per Department with photos ---
+    from PIL import Image as PILImage
+
     for t in TEAMS_ORDER:
         slide = prs.slides.add_slide(slide_layout)
         _add_text_box(slide, f"Top Asset Reusers - {t} (YTD 2026)", Inches(0.5), Inches(0.2),
@@ -389,14 +379,16 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
         top_y = Inches(1.0)
         for i, entry in enumerate(lb, 1):
             y_pos = top_y + Inches(i - 1) * Inches(1.2)
-            # Photo - validate before adding
+            # Photo - embed via BytesIO stream
             photo_path = settings.PHOTO_DIR / f"{entry['signum']}.jpg"
             if photo_path.exists() and photo_path.stat().st_size > 0:
                 try:
-                    from PIL import Image as PILImage
-                    img = PILImage.open(str(photo_path))
-                    img.verify()
-                    slide.shapes.add_picture(str(photo_path), Inches(0.5), y_pos, Inches(0.9), Inches(0.9))
+                    img_stream = BytesIO()
+                    with PILImage.open(str(photo_path)) as img:
+                        img = img.convert("RGB")
+                        img.save(img_stream, format="PNG")
+                    img_stream.seek(0)
+                    slide.shapes.add_picture(img_stream, Inches(0.5), y_pos, Inches(0.9), Inches(0.9))
                 except Exception:
                     pass
             # Name and details
@@ -410,7 +402,7 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
 
     prs.save(str(output_path))
 
-    # Cleanup temp chart images
+    # Cleanup temp chart files
     for f in settings.EXPORT_DIR.glob("_doc_chart_*.png"):
         f.unlink(missing_ok=True)
 

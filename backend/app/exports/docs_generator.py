@@ -33,12 +33,14 @@ def _get_month_label(canonical: str) -> str:
 
 
 def _get_year(months: list[str]) -> str:
+    """Get the most recent year from available months."""
+    years = set()
     for m in months:
         try:
-            return m.split("-")[0]
+            years.add(m.split("-")[0])
         except Exception:
             pass
-    return "2026"
+    return max(years) if years else "2026"
 
 
 def generate_monthly_savings_report() -> Path:

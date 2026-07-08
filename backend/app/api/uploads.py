@@ -134,9 +134,9 @@ async def add_feedback_exclusions(feedback_ids: list[str]):
     """Add Feedback IDs to permanent exclusion list."""
     from app.services.exclusion_store import exclusion_store
     exclusion_store.add_feedback_ids(feedback_ids)
-    # Also remove from current data
-    if data_store.download is not None:
-        data_store.download = data_store.download[~data_store.download["Feedback Id"].astype(str).isin(feedback_ids)]
+    # Reprocess download data to apply exclusions
+    if data_store.download_raw is not None:
+        data_store._process_download()
     return {"status": "added", "feedback_ids": exclusion_store.get_feedback_ids()}
 
 

@@ -45,10 +45,9 @@ async def download_png(
 
 @router.get("/docs/monthly-savings-report")
 async def download_monthly_savings_report():
-    """Download the Monthly Savings Report Excel file."""
-    filepath = settings.DOCS_DIR / "Monthly_Savings_Report.xlsx"
-    if not filepath.exists():
-        raise HTTPException(status_code=404, detail="Monthly Savings Report not found")
+    """Download the Monthly Savings Report Excel file, updating data from processed datasets."""
+    from app.exports.docs_generator import generate_monthly_savings_report
+    filepath = generate_monthly_savings_report()
     return FileResponse(
         filepath,
         filename="Monthly_Savings_Report.xlsx",

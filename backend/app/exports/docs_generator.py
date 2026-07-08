@@ -377,22 +377,31 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
     chart_path = _generate_chart_png("downloads_vs_reuse", months_2026)
     slide.shapes.add_picture(str(chart_path), Inches(0.5), Inches(1), Inches(12), Inches(5.5))
 
-    # --- Slide 7: Top Asset Reusers per Department ---
-    slide = prs.slides.add_slide(prs.slide_layouts[6])
-    _add_text_box(slide, "Top Asset Reusers by Department (YTD 2026)", Inches(0.5), Inches(0.2),
-                  Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
-
-    lb_data = [["#", "Name", "Department", "Reuse Saving", "Automation Saving", "Total Savings"]]
+    # --- Slides 7+: Top Asset Reusers per Department with photos ---
     for t in TEAMS_ORDER:
-        lb = compute_leaderboard(months_2026, t, top_n=3)
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        _add_text_box(slide, f"Top Asset Reusers - {t} (YTD 2026)", Inches(0.5), Inches(0.2),
+                      Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
+
+        lb = compute_leaderboard(months_2026, t, top_n=5)
+        top_y = Inches(1.0)
         for i, entry in enumerate(lb, 1):
-            lb_data.append([
-                str(i), entry["name"], t,
-                f"{entry['reuse_saving']:,.2f}",
-                f"{entry['automation_saving']:,.2f}",
-                f"{entry['total_savings']:,.2f}",
-            ])
-    _add_table(slide, lb_data, Inches(0.5), Inches(1), Inches(12), Inches(5.5))
+            y_pos = top_y + Inches(i - 1) * Inches(1.2)
+            # Photo
+            photo_path = settings.PHOTO_DIR / f"{entry['signum']}.jpg"
+            if photo_path.exists():
+                try:
+                    slide.shapes.add_picture(str(photo_path), Inches(0.5), y_pos, Inches(0.9), Inches(0.9))
+                except Exception:
+                    pass
+            # Name and details
+            _add_text_box(slide, f"{i}. {entry['name']}", Inches(1.6), y_pos,
+                          Inches(4), Inches(0.4), size=13, bold=True, color="1F4E79")
+            _add_text_box(slide, (
+                f"Reuse: {entry['reuse_saving']:,.2f}  |  "
+                f"Automation: {entry['automation_saving']:,.2f}  |  "
+                f"Total: {entry['total_savings']:,.2f}"
+            ), Inches(1.6), y_pos + Inches(0.4), Inches(8), Inches(0.4), size=10, color="475569")
 
     prs.save(str(output_path))
 

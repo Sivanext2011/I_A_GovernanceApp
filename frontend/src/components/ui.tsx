@@ -118,7 +118,7 @@ export function MonthMultiSelect({ months }: MonthSelectProps) {
   const { selectedMonths, setMonths, excludedMonths, setExcludedMonths } = useAppStore()
 
   const toggle = (m: string) => {
-    setMonths(selectedMonths.includes(m) ? selectedMonths.filter(x => x !== m) : [...selectedMonths, m])
+    setMonths(selectedMonths.includes(m) ? [] : [m])
     // Remove from excluded if selecting
     if (excludedMonths.includes(m)) setExcludedMonths(excludedMonths.filter(x => x !== m))
   }

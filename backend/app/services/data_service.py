@@ -111,6 +111,18 @@ class DataStore:
                     logger.warning(f"Override not matched: Feedback Id {fid} (0 rows found)")
             df.drop(columns=["_fid_str"], inplace=True)
         df["TotalSaving"] = df["Automation Saving"] + df["Reuse Saving"]
+        # Apply feedback exclusions to savings too
+        from app.services.exclusion_store import exclusion_store
+        excluded_fids = exclusion_store.get_feedback_ids()
+        if excluded_fids and "Feedback Id" in df.columns:
+            excluded_set = set(excluded_fids)
+            def _normalize_fid(x):
+                try:
+                    return str(int(float(x)))
+                except (ValueError, TypeError):
+                    return str(x).strip()
+            fid_normalized = df["Feedback Id"].apply(_normalize_fid)
+            df = df[~fid_normalized.isin(excluded_set)].copy()
         self.savings = df
 
     def load_download(self, filepath: Path) -> dict:

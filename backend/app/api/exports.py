@@ -59,22 +59,16 @@ async def download_monthly_savings_report():
 async def download_asset_presentation(
     period: str = Query("monthly", description="Period: monthly, quarterly, half-yearly, year-end")
 ):
-    """Download the Asset Presentation PowerPoint file for a given period."""
-    valid_periods = {
-        "monthly": "Asset_Monthly.pptx",
-        "quarterly": "Asset_Quarterly.pptx",
-        "half-yearly": "Asset_Half_Yearly.pptx",
-        "year-end": "Asset_Year_End.pptx",
-    }
+    """Generate and download the Asset Presentation PowerPoint for a given period."""
+    valid_periods = ["monthly", "quarterly", "half-yearly", "year-end"]
     if period not in valid_periods:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid period. Must be one of: {', '.join(valid_periods.keys())}"
+            detail=f"Invalid period. Must be one of: {', '.join(valid_periods)}"
         )
-    filename = valid_periods[period]
-    filepath = settings.DOCS_DIR / filename
-    if not filepath.exists():
-        raise HTTPException(status_code=404, detail=f"Asset Presentation ({period}) not found")
+    from app.exports.docs_generator import generate_asset_presentation
+    filepath = generate_asset_presentation(period)
+    filename = f"Asset_{period.replace('-', '_').title()}.pptx"
     return FileResponse(
         filepath,
         filename=filename,

@@ -138,7 +138,12 @@ class DataStore:
         excluded = exclusion_store.get_feedback_ids()
         if excluded:
             excluded_set = set(excluded)
-            fid_normalized = df["Feedback Id"].apply(lambda x: str(int(float(x))) if pd.notna(x) else "")
+            def _normalize_fid(x):
+                try:
+                    return str(int(float(x)))
+                except (ValueError, TypeError):
+                    return str(x).strip()
+            fid_normalized = df["Feedback Id"].apply(_normalize_fid)
             df = df[~fid_normalized.isin(excluded_set)].copy()
         self.download = df
 
@@ -185,7 +190,7 @@ class DataStore:
                         self.load_download(filepath)
                         logger.info(f"Auto-loaded Download: {filepath.name}")
             except Exception as e:
-                logger.debug(f"Skipped {filepath.name}: {e}")
+                logger.warning(f"Skipped {filepath.name}: {e}")
 
 
 # Singleton

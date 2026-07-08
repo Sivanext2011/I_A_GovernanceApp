@@ -137,9 +137,9 @@ class DataStore:
         from app.services.exclusion_store import exclusion_store
         excluded = exclusion_store.get_feedback_ids()
         if excluded:
-            df["_fid_str"] = df["Feedback Id"].astype(str).str.strip().str.split(".").str[0]
-            df = df[~df["_fid_str"].isin(excluded)]
-            df.drop(columns=["_fid_str"], inplace=True)
+            excluded_set = set(excluded)
+            fid_normalized = df["Feedback Id"].apply(lambda x: str(int(float(x))) if pd.notna(x) else "")
+            df = df[~fid_normalized.isin(excluded_set)].copy()
         self.download = df
 
     def get_available_months(self) -> list[str]:

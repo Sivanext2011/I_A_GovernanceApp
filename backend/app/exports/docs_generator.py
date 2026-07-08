@@ -310,18 +310,17 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
     prs.slide_width = Inches(13.33)
     prs.slide_height = Inches(7.5)
 
-    # Use blank layout (last one) to avoid content placeholder issues
-    blank_layout = prs.slide_layouts[len(prs.slide_layouts) - 1]
+    slide_layout = prs.slide_layouts[6]
 
     # --- Slide 1: Title ---
-    slide = prs.slides.add_slide(blank_layout)
+    slide = prs.slides.add_slide(slide_layout)
     _add_text_box(slide, "Monetization Analytics - 2026", Inches(1), Inches(2.5),
                   Inches(11), Inches(1.5), size=36, bold=True, color="1F4E79")
     _add_text_box(slide, f"Period: {period.title()} | Overall", Inches(1), Inches(4),
                   Inches(11), Inches(0.8), size=18, color="475569")
 
     # --- Slide 2: YTD KPIs ---
-    slide = prs.slides.add_slide(blank_layout)
+    slide = prs.slides.add_slide(slide_layout)
     _add_text_box(slide, "Year-to-Date KPIs (Overall)", Inches(0.5), Inches(0.3),
                   Inches(12), Inches(0.7), size=22, bold=True, color="1F4E79")
     ytd_kpis = compute_kpis(months_2026, "Overall")
@@ -353,28 +352,28 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
     _add_table(slide, team_data, Inches(0.5), Inches(3.8), Inches(12), Inches(2.5))
 
     # --- Slide 3: Monthly Savings Trend ---
-    slide = prs.slides.add_slide(blank_layout)
+    slide = prs.slides.add_slide(slide_layout)
     _add_text_box(slide, "Monthly Savings Trend", Inches(0.5), Inches(0.2),
                   Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
     chart_path = _generate_chart_png("savings_trend", months_2026)
     slide.shapes.add_picture(str(chart_path), Inches(0.5), Inches(1), Inches(12), Inches(5.5))
 
     # --- Slide 4: Savings % Trend ---
-    slide = prs.slides.add_slide(blank_layout)
+    slide = prs.slides.add_slide(slide_layout)
     _add_text_box(slide, "Savings % Trend", Inches(0.5), Inches(0.2),
                   Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
     chart_path = _generate_chart_png("savings_pct", months_2026)
     slide.shapes.add_picture(str(chart_path), Inches(0.5), Inches(1), Inches(12), Inches(5.5))
 
     # --- Slide 5: Department wise Savings ---
-    slide = prs.slides.add_slide(blank_layout)
+    slide = prs.slides.add_slide(slide_layout)
     _add_text_box(slide, "Department wise Savings", Inches(0.5), Inches(0.2),
                   Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
     chart_path = _generate_chart_png("dept_comparison", months_2026)
     slide.shapes.add_picture(str(chart_path), Inches(0.5), Inches(1), Inches(12), Inches(5.5))
 
     # --- Slide 6: Downloads vs Reuse ---
-    slide = prs.slides.add_slide(blank_layout)
+    slide = prs.slides.add_slide(slide_layout)
     _add_text_box(slide, "Downloads vs Reuse", Inches(0.5), Inches(0.2),
                   Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
     chart_path = _generate_chart_png("downloads_vs_reuse", months_2026)
@@ -382,7 +381,7 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
 
     # --- Slides 7+: Top Asset Reusers per Department with photos ---
     for t in TEAMS_ORDER:
-        slide = prs.slides.add_slide(blank_layout)
+        slide = prs.slides.add_slide(slide_layout)
         _add_text_box(slide, f"Top Asset Reusers - {t} (YTD 2026)", Inches(0.5), Inches(0.2),
                       Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
 
@@ -390,10 +389,13 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
         top_y = Inches(1.0)
         for i, entry in enumerate(lb, 1):
             y_pos = top_y + Inches(i - 1) * Inches(1.2)
-            # Photo
+            # Photo - validate before adding
             photo_path = settings.PHOTO_DIR / f"{entry['signum']}.jpg"
-            if photo_path.exists():
+            if photo_path.exists() and photo_path.stat().st_size > 0:
                 try:
+                    from PIL import Image as PILImage
+                    img = PILImage.open(str(photo_path))
+                    img.verify()
                     slide.shapes.add_picture(str(photo_path), Inches(0.5), y_pos, Inches(0.9), Inches(0.9))
                 except Exception:
                     pass

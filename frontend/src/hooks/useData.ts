@@ -45,10 +45,11 @@ export function useKPIs() {
 }
 
 export function useYTDKPIs() {
-  const { selectedTeam } = useAppStore()
+  const { selectedTeam, selectedMonths, excludedMonths } = useAppStore()
+  const months = getEffectiveMonths(selectedMonths, excludedMonths)
   return useQuery({
-    queryKey: ['ytd-kpis', selectedTeam],
-    queryFn: () => api.getYTDKPIs(selectedTeam),
+    queryKey: ['ytd-kpis', selectedTeam, months],
+    queryFn: () => api.getYTDKPIs(selectedTeam, months),
   })
 }
 

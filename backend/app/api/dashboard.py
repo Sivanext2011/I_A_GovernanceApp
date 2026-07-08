@@ -35,7 +35,16 @@ async def get_kpis(
 
 
 @router.get("/kpis/ytd")
-async def get_ytd_kpis(team: str = Query("Overall")):
+async def get_ytd_kpis(
+    team: str = Query("Overall"),
+    months: Optional[str] = Query(None, description="Comma-separated months for current period")
+):
+    if months:
+        month_list = months.split(",")
+        current_kpis = compute_kpis(month_list, team)
+        all_months = data_store.get_available_months()
+        ytd_kpis = compute_kpis(all_months, team)
+        return {"current": current_kpis, "ytd": ytd_kpis}
     return compute_ytd_kpis(team)
 
 

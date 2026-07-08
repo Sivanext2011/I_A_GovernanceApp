@@ -15,8 +15,8 @@ export const getTeams = () => api.get('/dashboard/teams').then(r => r.data)
 export const getKPIs = (team: string, months?: string) =>
   api.get('/dashboard/kpis', { params: { team, months } }).then(r => r.data)
 
-export const getYTDKPIs = (team: string) =>
-  api.get('/dashboard/kpis/ytd', { params: { team } }).then(r => r.data)
+export const getYTDKPIs = (team: string, months?: string) =>
+  api.get('/dashboard/kpis/ytd', { params: { team, months } }).then(r => r.data)
 
 export const getMonthlyTrend = (team: string) =>
   api.get('/dashboard/charts/monthly-trend', { params: { team } }).then(r => r.data)

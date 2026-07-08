@@ -8,7 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 
 export default function AnalyticsPage() {
   const { data: monthsData } = useMonths()
-  const { selectedTeam } = useAppStore()
+  const { selectedTeam, selectedMonths } = useAppStore()
   const { data: ytd, isLoading } = useYTDKPIs()
   const { data: trend } = useMonthlyTrend()
   const { data: deptComp } = useDeptComparison()
@@ -46,7 +46,7 @@ export default function AnalyticsPage() {
             <KPICard title="YTD Billability" value={ytd.ytd.billability_hours} icon={BarChart3} gradient="bg-gradient-to-br from-amber-500 to-amber-700" delay={0.4} />
           </div>
 
-          <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide">Current Month</h3>
+          <h3 className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide">{selectedMonths.length > 0 ? `Selected Period (${selectedMonths.length} month${selectedMonths.length > 1 ? 's' : ''})` : 'Current Month'}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             <KPICard title="Monthly Savings" value={ytd.current.total_savings} icon={DollarSign} gradient="bg-gradient-to-br from-blue-400 to-blue-600" />
             <KPICard title="Monthly Savings %" value={ytd.current.savings_percent} icon={TrendingUp} suffix="%" gradient="bg-gradient-to-br from-teal-400 to-teal-600" delay={0.1} />

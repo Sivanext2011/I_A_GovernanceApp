@@ -182,9 +182,13 @@ def generate_monthly_savings_report() -> Path:
         ws.cell(row=ytd_row, column=c).font = Font(bold=True)
 
     # Auto-fit columns
-    for col_cells in ws.columns:
-        max_len = max(len(str(c.value or "")) for c in col_cells)
-        ws.column_dimensions[col_cells[0].column_letter].width = min(max_len + 2, 35)
+    from openpyxl.utils import get_column_letter
+    for col_idx in range(1, ws.max_column + 1):
+        max_len = 0
+        for row_idx in range(1, ws.max_row + 1):
+            cell = ws.cell(row=row_idx, column=col_idx)
+            max_len = max(max_len, len(str(cell.value or "")))
+        ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, 35)
 
     wb.save(output_path)
     logger.info(f"Monthly Savings Report generated: {output_path}")

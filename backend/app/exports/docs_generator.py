@@ -120,7 +120,11 @@ def generate_monthly_savings_report() -> Path:
     ws.title = f"Monthly Data {YEAR}"
     _write_monthly_data_sheet(ws, months_2026, all_months_canonical)
 
-    # === SHEET 2: Charts ===
+    # === SHEET 2: Top Practitioners ===
+    ws_top = wb.create_sheet("Top Practitioners")
+    _write_top_practitioners_sheet(ws_top, months_2026)
+
+    # === SHEET 3: Charts ===
     ws_charts = wb.create_sheet("Charts")
     _write_charts_sheet(ws_charts, months_2026)
 
@@ -268,6 +272,128 @@ def _write_monthly_data_sheet(ws, months_2026, all_months_canonical):
         ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, 35)
 
 
+def _get_manager_name(supervisor_no) -> str:
+    """Look up manager name from supervisor personal number."""
+    if not supervisor_no or data_store.mapping is None:
+        return ""
+    mapping = data_store.mapping
+    match = mapping[mapping["Pers.no."] == supervisor_no]
+    if not match.empty:
+        return match.iloc[0].get("Emp Name", "")
+    return ""
+
+
+def _get_top_practitioners(months: list[str], team: str, top_n: int = 10) -> list[dict]:
+    """Get top practitioners with name, signum, manager, department, savings hours."""
+    from app.services.data_service import data_store
+    from app.analytics.engine import _filter_by_months, _filter_by_team
+
+    savings_df = _filter_by_months(_filter_by_team(data_store.savings, team), months)
+    if savings_df.empty:
+        return []
+
+    grouped = savings_df.groupby("Signum").agg(
+        reuse_saving=("Reuse Saving", "sum"),
+        automation_saving=("Automation Saving", "sum"),
+    ).reset_index()
+    grouped["total_savings"] = grouped["reuse_saving"] + grouped["automation_saving"]
+    grouped = grouped.sort_values("total_savings", ascending=False).head(top_n)
+
+    results = []
+    for _, row in grouped.iterrows():
+        signum = row["Signum"]
+        name = signum
+        manager = ""
+        dept = team if team != "Overall" else ""
+
+        if data_store.mapping is not None:
+            match = data_store.mapping[
+                data_store.mapping["Corporate ID"].str.strip().str.lower() == str(signum).strip().lower()
+            ]
+            if not match.empty:
+                name = match.iloc[0].get("Emp Name", signum)
+                dept = match.iloc[0].get("Department", dept)
+                sup_no = match.iloc[0].get("Supervisor Personal No.", None)
+                manager = _get_manager_name(sup_no)
+
+        results.append({
+            "name": name,
+            "signum": signum,
+            "manager": manager,
+            "department": dept,
+            "savings_hours": round(float(row["total_savings"]), 2),
+        })
+    return results
+
+
+def _write_top_practitioners_sheet(ws, months_2026):
+    """Write top practitioners by department, month, and overall."""
+    all_months_canonical = [f"{YEAR}-{str(i).zfill(2)}" for i in range(1, 13)]
+    headers = ["#", "Name", "Signum", "Manager", "Department", "Savings Hours"]
+    row = 1
+
+    # --- Overall YTD ---
+    ws.cell(row=row, column=1, value="Overall - YTD Top Practitioners").font = Font(bold=True, size=12)
+    row += 1
+    for c, h in enumerate(headers, 1):
+        cell = ws.cell(row=row, column=c, value=h)
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.border = THIN_BORDER
+    row += 1
+    for i, p in enumerate(_get_top_practitioners(months_2026, "Overall", 10), 1):
+        for c, val in enumerate([i, p["name"], p["signum"], p["manager"], p["department"], p["savings_hours"]], 1):
+            cell = ws.cell(row=row, column=c, value=val)
+            cell.border = THIN_BORDER
+        row += 1
+    row += 2
+
+    # --- Department wise YTD ---
+    for team in TEAMS_ORDER:
+        ws.cell(row=row, column=1, value=f"{team} - YTD Top Practitioners").font = Font(bold=True, size=12)
+        row += 1
+        for c, h in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=c, value=h)
+            cell.font = HEADER_FONT
+            cell.fill = TEAM_FILL
+            cell.border = THIN_BORDER
+        row += 1
+        for i, p in enumerate(_get_top_practitioners(months_2026, team, 10), 1):
+            for c, val in enumerate([i, p["name"], p["signum"], p["manager"], p["department"], p["savings_hours"]], 1):
+                cell = ws.cell(row=row, column=c, value=val)
+                cell.border = THIN_BORDER
+            row += 1
+        row += 2
+
+    # --- Month wise (Overall) ---
+    for month_canonical in all_months_canonical:
+        if month_canonical not in months_2026:
+            continue
+        month_label = _month_label(month_canonical)
+        ws.cell(row=row, column=1, value=f"{month_label} {YEAR} - Top Practitioners (Overall)").font = Font(bold=True, size=12)
+        row += 1
+        for c, h in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=c, value=h)
+            cell.font = HEADER_FONT
+            cell.fill = HEADER_FILL
+            cell.border = THIN_BORDER
+        row += 1
+        for i, p in enumerate(_get_top_practitioners([month_canonical], "Overall", 10), 1):
+            for c, val in enumerate([i, p["name"], p["signum"], p["manager"], p["department"], p["savings_hours"]], 1):
+                cell = ws.cell(row=row, column=c, value=val)
+                cell.border = THIN_BORDER
+            row += 1
+        row += 2
+
+    # Auto-fit columns
+    for col_idx in range(1, 7):
+        max_len = 0
+        for r in range(1, ws.max_row + 1):
+            val = ws.cell(row=r, column=col_idx).value
+            max_len = max(max_len, len(str(val or "")))
+        ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 2, 35)
+
+
 def _write_charts_sheet(ws, months_2026):
     """Write Monetization Analytics charts as images into the Charts sheet."""
     ws.cell(row=1, column=1, value="Monetization Analytics - Overall (2026)")
@@ -290,11 +416,6 @@ def _write_charts_sheet(ws, months_2026):
         except Exception as e:
             ws.cell(row=row, column=1, value=f"Chart generation failed: {e}")
             row += 2
-
-
-# ============================================================
-# POWERPOINT GENERATION
-# ============================================================
 
 def generate_asset_presentation(period: str = "monthly") -> Path:
     """Generate Asset Presentation PowerPoint with charts, top reusers, and YTD."""

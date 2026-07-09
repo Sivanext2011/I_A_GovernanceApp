@@ -299,9 +299,8 @@ def _write_charts_sheet(ws, months_2026):
 def generate_asset_presentation(period: str = "monthly") -> Path:
     """Generate Asset Presentation PowerPoint with charts, top reusers, and YTD."""
     from pptx import Presentation
-    from pptx.util import Inches, Pt, Emu
+    from pptx.util import Inches, Pt
     from pptx.dml.color import RGBColor
-    from pptx.enum.text import PP_ALIGN
 
     output_path = settings.EXPORT_DIR / f"Asset_{period.replace('-', '_').title()}.pptx"
     months_2026 = _get_2026_months()
@@ -310,17 +309,17 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
     prs.slide_width = Inches(13.33)
     prs.slide_height = Inches(7.5)
 
-    slide_layout = prs.slide_layouts[6]
+    blank_layout = prs.slide_layouts[6]
 
     # --- Slide 1: Title ---
-    slide = prs.slides.add_slide(slide_layout)
+    slide = prs.slides.add_slide(blank_layout)
     _add_text_box(slide, "Monetization Analytics - 2026", Inches(1), Inches(2.5),
                   Inches(11), Inches(1.5), size=36, bold=True, color="1F4E79")
     _add_text_box(slide, f"Period: {period.title()} | Overall", Inches(1), Inches(4),
                   Inches(11), Inches(0.8), size=18, color="475569")
 
     # --- Slide 2: YTD KPIs ---
-    slide = prs.slides.add_slide(slide_layout)
+    slide = prs.slides.add_slide(blank_layout)
     _add_text_box(slide, "Year-to-Date KPIs (Overall)", Inches(0.5), Inches(0.3),
                   Inches(12), Inches(0.7), size=22, bold=True, color="1F4E79")
     ytd_kpis = compute_kpis(months_2026, "Overall")
@@ -337,7 +336,6 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
     ]
     _add_table(slide, kpi_data, Inches(0.5), Inches(1.2), Inches(12), Inches(1.2))
 
-    # Team-wise YTD
     _add_text_box(slide, "Team-wise YTD", Inches(0.5), Inches(3), Inches(12), Inches(0.6),
                   size=16, bold=True, color="2E86AB")
     team_data = [["Team", "Total Savings", "Savings %", "Downloads", "Reused", "Pending", "Billability"]]
@@ -351,7 +349,7 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
         ])
     _add_table(slide, team_data, Inches(0.5), Inches(3.8), Inches(12), Inches(2.5))
 
-    # --- Slide 3-6: Charts ---
+    # --- Slide 3-6: Charts as embedded PNG ---
     chart_slides = [
         ("Monthly Savings Trend", "savings_trend"),
         ("Savings % Trend", "savings_pct"),
@@ -359,17 +357,18 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
         ("Downloads vs Reuse", "downloads_vs_reuse"),
     ]
     for title, chart_type in chart_slides:
-        slide = prs.slides.add_slide(slide_layout)
+        slide = prs.slides.add_slide(blank_layout)
         _add_text_box(slide, title, Inches(0.5), Inches(0.2),
                       Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
-        chart_path = _generate_chart_png(chart_type, months_2026)
-        with open(str(chart_path), "rb") as f:
-            img_stream = BytesIO(f.read())
-        slide.shapes.add_picture(img_stream, Inches(0.5), Inches(1), Inches(12), Inches(5.5))
+        try:
+            chart_path = _generate_chart_png(chart_type, months_2026)
+            slide.shapes.add_picture(str(chart_path), Inches(0.5), Inches(1), Inches(12), Inches(5.5))
+        except Exception:
+            pass
 
     # --- Slides 7+: Top Asset Reusers per Department ---
     for t in TEAMS_ORDER:
-        slide = prs.slides.add_slide(slide_layout)
+        slide = prs.slides.add_slide(blank_layout)
         _add_text_box(slide, f"Top Asset Reusers - {t} (YTD 2026)", Inches(0.5), Inches(0.2),
                       Inches(12), Inches(0.6), size=20, bold=True, color="1F4E79")
 
@@ -385,7 +384,11 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
                 f"Total: {entry['total_savings']:,.2f}"
             ), Inches(0.5), y_pos + Inches(0.4), Inches(8), Inches(0.4), size=10, color="475569")
 
-    prs.save(str(output_path))
+    # Save to BytesIO first, then write to file (avoids partial write issues)
+    pptx_buffer = BytesIO()
+    prs.save(pptx_buffer)
+    with open(str(output_path), "wb") as f:
+        f.write(pptx_buffer.getvalue())
 
     # Cleanup temp chart files
     for f in settings.EXPORT_DIR.glob("_doc_chart_*.png"):

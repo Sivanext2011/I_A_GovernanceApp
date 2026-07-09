@@ -365,11 +365,13 @@ def _write_top_practitioners_sheet(ws, months_2026):
             row += 1
         row += 2
 
-    # --- Month wise (Overall) ---
+    # --- Month wise (Overall + Department wise) ---
     for month_canonical in all_months_canonical:
         if month_canonical not in months_2026:
             continue
         month_label = _month_label(month_canonical)
+
+        # Overall for this month
         ws.cell(row=row, column=1, value=f"{month_label} {YEAR} - Top Practitioners (Overall)").font = Font(bold=True, size=12)
         row += 1
         for c, h in enumerate(headers, 1):
@@ -383,7 +385,25 @@ def _write_top_practitioners_sheet(ws, months_2026):
                 cell = ws.cell(row=row, column=c, value=val)
                 cell.border = THIN_BORDER
             row += 1
-        row += 2
+        row += 1
+
+        # Department wise for this month
+        for team in TEAMS_ORDER:
+            ws.cell(row=row, column=1, value=f"{month_label} {YEAR} - Top Practitioners ({team})").font = Font(bold=True, size=11)
+            row += 1
+            for c, h in enumerate(headers, 1):
+                cell = ws.cell(row=row, column=c, value=h)
+                cell.font = HEADER_FONT
+                cell.fill = TEAM_FILL
+                cell.border = THIN_BORDER
+            row += 1
+            for i, p in enumerate(_get_top_practitioners([month_canonical], team, 10), 1):
+                for c, val in enumerate([i, p["name"], p["signum"], p["manager"], p["department"], p["savings_hours"]], 1):
+                    cell = ws.cell(row=row, column=c, value=val)
+                    cell.border = THIN_BORDER
+                row += 1
+            row += 1
+        row += 1
 
     # Auto-fit columns
     for col_idx in range(1, 7):

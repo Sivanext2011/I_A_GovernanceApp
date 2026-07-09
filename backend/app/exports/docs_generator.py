@@ -398,21 +398,31 @@ def generate_asset_presentation(period: str = "monthly") -> Path:
     return output_path
 
 
+def _safe_str(val) -> str:
+    """Convert value to safe string for PPTX (no NaN/None/inf)."""
+    if val is None:
+        return ""
+    s = str(val)
+    if s in ("nan", "NaN", "inf", "-inf", "None"):
+        return ""
+    return s
+
+
 def _add_text_box(slide, text, left, top, width, height, size=14, bold=False, color="000000"):
-    from pptx.util import Inches, Pt
+    from pptx.util import Pt
     from pptx.dml.color import RGBColor
 
     txBox = slide.shapes.add_textbox(left, top, width, height)
     tf = txBox.text_frame
     p = tf.paragraphs[0]
-    p.text = text
+    p.text = _safe_str(text)
     p.font.size = Pt(size)
     p.font.bold = bold
     p.font.color.rgb = RGBColor.from_string(color)
 
 
 def _add_table(slide, data, left, top, width, height):
-    from pptx.util import Inches, Pt
+    from pptx.util import Pt
     from pptx.dml.color import RGBColor
 
     rows = len(data)
@@ -423,7 +433,7 @@ def _add_table(slide, data, left, top, width, height):
     for r_idx, row in enumerate(data):
         for c_idx, val in enumerate(row):
             cell = table.cell(r_idx, c_idx)
-            cell.text = str(val)
+            cell.text = _safe_str(val)
             for paragraph in cell.text_frame.paragraphs:
                 paragraph.font.size = Pt(10)
                 if r_idx == 0:
